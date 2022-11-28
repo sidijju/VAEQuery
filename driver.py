@@ -1,4 +1,7 @@
+from environments.envs import *
+from visualize import visualize
 from configs import gridworld
+from policies import rand, greedy, rl
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -12,9 +15,9 @@ if env == 'gridworld':
     args.action_dim = 1
     args.task_dim = 2
     args.env_type == env
-    # visualize learning of random policy
-    visualize(GridWorld(), policies.random_policy.run_policy, fname="random")
-    # visualize learning of varibadPolicy
-    #visualize(env, MetaLearner(args), fname="varibad")
+    # visualize learning of policies
+    visualize(GridWorld(), rand.run_policy, fname="random")
+    visualize(GridWorld(), greedy.run_policy, fname="greedy")
+    visualize(GridWorld(), rl.run_policy, fname="rl")
 else:
     print('Invalid Environment Option')
