@@ -25,9 +25,24 @@ class FeatureExtractor:
         pass
 
     def featurize(self, traj):
-        features = 5
+        features = np.zeros_like(self.args.num_features)
         obs, actions, next_obs, rews = traj
-        pass
+        
+        if self.args.env_type == 'gridworld':
+            #feature 1 - total reward
+            features[0] = rews.sum()
+
+            #feature 2 - number of actions that aren't stay
+            features[1] = len(actions) - np.count_nonzero(actions == 4)
+
+            #feature 3 - 
+
+            #feature 4 - 
+
+            #feature 5 - 
+        
+        return features
+
 
 def collect_random_trajectory(world):
     world.reset()

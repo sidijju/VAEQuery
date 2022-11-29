@@ -1,4 +1,4 @@
-from utils.helpers import collect_dataset, sample_gaussian
+from utils.helpers import collect_dataset, sample_gaussian, makedir
 from models import encoder, belief
 from query.simulate import SimulatedHuman
 from torch import optim, nn
@@ -32,8 +32,12 @@ class Learner:
         # define loss function for VAE
         self.loss = nn.CrossEntropyLoss()
 
+        # directory for plots
+        self.dir = self.exp_name + "/" + self.policy.vis_directory
+
     def train(self, visualize=False):
         
+        alignments = []
         errors = []
         losses = []
 
@@ -55,26 +59,36 @@ class Learner:
             loss.backward()
             self.optimizer.step()
 
-            mse = nn.MSELoss(beliefs, [self.human for _ in range(self.args.batchsize)])
+            mse = nn.MSELoss(beliefs, [self.human.w for _ in range(self.args.batchsize)])
+            alignment = [np.dot(b, self.human.w)/(np.linalg.norm(b)*np.linalg.norm(self.human.w)) for b in beliefs].mean()
 
-            print("Iteration %2d: Loss = %.3f, MSE = %.3f" % (i, loss, mse))
+            print("Iteration %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (i, loss, mse, alignment))
 
             errors.append(mse)
             losses.append(loss)
+            alignments.append(alignment)
 
         # save plots for errors and losses after pre training
         if visualize:
+            makedir(dirname=self.dir)
+
             plt.plot(errors)
             plt.xlabel("Iterations")
             plt.ylabel("MSE")
             plt.title("Belief vs. True Reward Error")
-            plt.savefig(self.policy.vis_directory + self.exp_name + "/error")
+            plt.savefig(self.dir + "error")
 
             plt.plot(losses)
             plt.xlabel("Iterations")
             plt.ylabel("CE Error")
             plt.title("Query Distribution vs. Answer Error")
-            plt.savefig(self.policy.vis_directory + self.exp_name + "loss")
+            plt.savefig(self.dir + "loss")
+
+            plt.plot(alignments)
+            plt.xlabel("Iterations")
+            plt.ylabel("Alignment")
+            plt.title("Reward Alignment")
+            plt.savefig(self.dir + "alignment")
             
         print("########### TRAINING ###########")
         # alternate between training encoder and training policy
