@@ -23,3 +23,4 @@ def visualize_behavior(world, ax, dim, observations):
     ax.plot(plot_obs[:, 0], plot_obs[:, 1], 'b-')
     ax.plot(plot_obs[-1, 0], plot_obs[-1, 1], 'b.')
     ax.plot(plot_task[0], plot_task[1], 'kx')
+    

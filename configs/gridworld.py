@@ -10,7 +10,7 @@ def args(rest_args):
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--log_dir', type=Path, default=Path('/logs'))
     parser.add_argument('--save_interval', type=int, default=10)
-    parser.add_argument('--precollect_len', type=int, default=100,
+    parser.add_argument('--precollect_num', type=int, default=100,
                         help='how many trajectories to pre-collect before training begins')
 
     ##### POLICY #####
@@ -25,9 +25,7 @@ def args(rest_args):
     parser.add_argument('--vae_buffer_size', type=int, default=100000,
                         help='how many trajectories to keep in VAE buffer')
     parser.add_argument('--vae_pretrain_len', type=int, default=5000,
-                        help='how many steps to pretrain the vae')
-    parser.add_argument('--vae_buffer_add_thresh', type=float, default=1,
-                        help='probability of adding a new trajectory to buffer')
+                        help='how many iterations to pretrain the vae')
     parser.add_argument('--vae_batchsize', type=int, default=25,
                         help='how many trajectories to use for VAE update')
     parser.add_argument('--vae_max_trajectory_len', type=int, default=15,

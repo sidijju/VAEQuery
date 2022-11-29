@@ -1,20 +1,17 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils.helpers import FeatureExtractor
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class Encoder(nn.Module):
 
-    def __init__(self, args, input_dim = 2):
+    def __init__(self, args):
         super(Encoder, self).__init__()
-        # input_dim  --> size of input representation for each trajectory (number of features)
-        # fc_dim --> size of GRU hidden dimension
 
         # fc layer before passing into GRU units
         # TODO: add option to make multiple layers
-        input_dim = args.query_size * input_dim
+        input_dim = args.query_size * args.num_features
         self.fc_before = nn.Linear(input_dim, args.vae_fc_dim)
 
         # RNN functionality

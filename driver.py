@@ -1,8 +1,11 @@
 from environments.envs import *
 from visualize import visualize
+from models import *
 from configs import gridworld
 from policies import rand, greedy, rl
+from utils.helpers import collect_trajectories
 import argparse
+import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--env-type', default='gridworld')
@@ -11,13 +14,24 @@ env = args.env_type
 
 if env == 'gridworld':
     args = gridworld.args(rargs)
-    args.state_dim = 2
-    args.action_dim = 1
-    args.task_dim = 2
+    args.num_features = 5
     args.env_type == env
-    # visualize learning of policies
-    visualize(GridWorld(args), rand.run_policy, fname="random")
-    visualize(GridWorld(args), greedy.run_policy, fname="greedy")
-    visualize(GridWorld(args), rl.run_policy, fname="rl")
+    
+    # collect dataset on world
+    world = GridWorld(args)
+    dataset = collect_trajectories(world)
+
 else:
     print('Invalid Environment Option')
+
+def train(args, policy, dataset):
+    # initialize true human reward
+    w = np.random.random(args.num_features)
+    w /= w.sum()
+
+    # initialize encoder network
+    encoder = encoder.Encoder(args)
+
+    # initialize belief network
+    belief = belief.Belief(args)
+
