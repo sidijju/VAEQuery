@@ -6,10 +6,10 @@ import torch
 
 class GridWorld(gym.Env):
 
-    def __init__(self, size=5):
+    def __init__(self, args):
        
-        assert size > 1
-        self.size = size
+        assert args.grid_size > 1
+        self.size = args.grid_size
 
         # for gridworld, we cannot observe target
         self.observation_space = spaces.Box(low=0, high=self.size-1, shape=(2,))

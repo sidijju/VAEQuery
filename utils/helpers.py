@@ -3,6 +3,7 @@ import pickle
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from visualize import visualize_behavior
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -15,13 +16,18 @@ def sample_gaussian(mu, logvar):
     norm_sample = torch.randn_like(stddev)
     return norm_sample.mul(stddev).add(mu)
 
-class FeatureExtractor(nn.Module):
+class FeatureExtractor:
 
-    def __init__(self, input_size, output_size, activation_function=F.relu):
-        super(FeatureExtractor, self).__init__()
-        self.output_size = output_size
-        self.activation_function = activation_function
-        self.fc = nn.Linear(input_size, output_size)
+    #return features from a trajectory
 
-    def forward(self, inputs):
-        return self.activation_function(self.fc(inputs))
+    def __init__(self):
+        pass
+
+def collect_trajectory():
+    pass
+
+def collect_trajectories(n=100):
+    pass
+
+def visualize_trajectory():
+    pass

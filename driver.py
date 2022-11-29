@@ -16,8 +16,8 @@ if env == 'gridworld':
     args.task_dim = 2
     args.env_type == env
     # visualize learning of policies
-    visualize(GridWorld(), rand.run_policy, fname="random")
-    visualize(GridWorld(), greedy.run_policy, fname="greedy")
-    visualize(GridWorld(), rl.run_policy, fname="rl")
+    visualize(GridWorld(args), rand.run_policy, fname="random")
+    visualize(GridWorld(args), greedy.run_policy, fname="greedy")
+    visualize(GridWorld(args), rl.run_policy, fname="rl")
 else:
     print('Invalid Environment Option')
