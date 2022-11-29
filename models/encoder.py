@@ -23,11 +23,11 @@ class Encoder(nn.Module):
         # TODO: add option to make multiple layers
         self.output = nn.Linear(args.gru_hidden_size, args.latent_dim)
 
-    def forward(self, query):
+    def forward(self, query, hidden=None):
         
         # run through layers
-        output = self.fc_before(input)
-        output, _ = self.gru(output, query)
+        output = self.fc_before(query)
+        output, _ = self.gru(output, hidden)
         output = self.output(output)
 
         return output

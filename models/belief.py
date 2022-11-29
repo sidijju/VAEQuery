@@ -11,7 +11,7 @@ class Belief(nn.Module):
         super(Belief, self).__init__()
 
         layers = []
-        curr = args.vae_latent_dim
+        curr = args.latent_dim
         for l in args.fc_layers:
             layers.append(nn.Linear(curr, l))
         self.layers = layers

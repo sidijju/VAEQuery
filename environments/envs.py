@@ -7,16 +7,18 @@ import torch
 class GridWorld(gym.Env):
 
     def __init__(self, args):
+
+        self.horizon = args.max_trajectory_len
+        assert self.horizon > 0
        
-        assert args.grid_size > 1
         self.size = args.grid_size
+        assert self.size > 1
 
         # for gridworld, we cannot observe target
         self.observation_space = spaces.Box(low=0, high=self.size-1, shape=(2,))
         self.action_space = spaces.Discrete(5)
 
         self.task_dim = 2
-        self.belief_dim = 2
         self.state_dim = 2
         self.action_dim = 1
 

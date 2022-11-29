@@ -1,9 +1,8 @@
 import os
-import pickle
+import numpy as np
 import torch
-import torch.nn as nn
-from torch.nn import functional as F
 from visualize import visualize_behavior
+from storage.vae_storage import VAEStorage
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -25,11 +24,44 @@ class FeatureExtractor:
     def __init__(self):
         pass
 
-def collect_trajectory(world):
-    pass
+    def featurize(self, traj):
+        features = 5
+        obs, actions, next_obs, rews = traj
+        pass
 
-def collect_trajectories(world, n=100):
-    pass
+def collect_random_trajectory(world):
+    world.reset()
 
-def visualize_trajectory(traj):
-    pass
+    # horizon number of (s, a, s', r) tuples
+    obs = np.zeros((world.horizon, world.state_dim))
+    actions = np.zeros((world.horizon, world.action_dim))
+    next_obs = np.zeros((world.horizon, world.state_dim))
+    rews = np.zeros((world.horizon, world.state_dim))
+
+    for i in range(world.horizon):
+        obs[i] = world.state
+        action = world.action_space.sample()
+        actions[i] = action
+        next_ob, rew, _, _ = world.step(action)
+        next_obs[i] = next_ob
+        rews[i] = rew
+
+    return obs, actions, next_obs, rews
+
+def collect_dataset(args, world, human):
+    feature_extractor = FeatureExtractor(args)
+    dataset = VAEStorage(args)
+
+    assert args.precollect_num > args.batchsize
+
+    for _ in range(args.precollect_num):
+        query = []
+        for _ in range(args.query_size):
+            traj = collect_random_trajectory(world)
+            featurized = feature_extractor.featurize(traj)
+            query.extend(featurized)
+        
+        answer = human.response(query)
+        dataset.insert(query, answer)
+    
+    return dataset
