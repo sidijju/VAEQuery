@@ -10,8 +10,9 @@ def args(rest_args):
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--log_dir', type=Path, default=Path('/logs'))
     parser.add_argument('--save_interval', type=int, default=10)
-    parser.add_argument('--precollect_num', type=int, default=100,
-                        help='how many trajectories to pre-collect before training begins')
+
+    parser.add_argument('--temperature', type=int, default=10,
+                        help='Boltzmann rationality temperature')
 
     ##### POLICY #####
 
@@ -20,23 +21,24 @@ def args(rest_args):
                         help='number of trajectories to choose from in one query')
 
     ##### VAE #####
-
-    parser.add_argument('--vae_lr', type=float, default=0.001)
-    parser.add_argument('--vae_buffer_size', type=int, default=100000,
+    parser.add_argument('--precollect_num', type=int, default=100,
+                        help='how many trajectories to pre-collect before training begins')
+    parser.add_argument('--buffer_size', type=int, default=1000,
                         help='how many trajectories to keep in VAE buffer')
-    parser.add_argument('--vae_pretrain_len', type=int, default=5000,
+    parser.add_argument('--pretrain_len', type=int, default=5000,
                         help='how many iterations to pretrain the vae')
-    parser.add_argument('--vae_batchsize', type=int, default=25,
+    parser.add_argument('--lr', type=float, default=0.001)
+    parser.add_argument('--batchsize', type=int, default=25,
                         help='how many trajectories to use for VAE update')
-    parser.add_argument('--vae_max_trajectory_len', type=int, default=15,
+    parser.add_argument('--max_trajectory_len', type=int, default=15,
                         help='maximum length of trajectory')
-    parser.add_argument('--vae_fc_dim', type=int, default=1, 
+    parser.add_argument('--fc_dim', type=int, default=1, 
                         help='dimensionality of fc input to GRU')
-    parser.add_argument('--vae_gru_hidden_layers', type=int, default=1, 
+    parser.add_argument('--gru_hidden_layers', type=int, default=1, 
                         help='number of hidden layers')
-    parser.add_argument('--vae_gru_hidden_size', type=int, default=64, 
+    parser.add_argument('--gru_hidden_size', type=int, default=64, 
                         help='size of hidden layers')
-    parser.add_argument('--vae_latent_dim', type=int, default=5, 
+    parser.add_argument('--latent_dim', type=int, default=5, 
                         help='dimensionality of latent space')
     
 

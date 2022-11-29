@@ -19,7 +19,7 @@ if env == 'gridworld':
     
     # collect dataset on world
     world = GridWorld(args)
-    dataset = collect_trajectories(world)
+    dataset = collect_trajectories(world, n=args.precollect_num)
 
 else:
     print('Invalid Environment Option')
@@ -34,4 +34,3 @@ def train(args, policy, dataset):
 
     # initialize belief network
     belief = belief.Belief(args)
-

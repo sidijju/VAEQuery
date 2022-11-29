@@ -20,14 +20,16 @@ class FeatureExtractor:
 
     #return features from a trajectory
 
+    #update driver.py with num_features if change in number of features
+
     def __init__(self):
         pass
 
-def collect_trajectory():
+def collect_trajectory(world):
     pass
 
-def collect_trajectories(n=100):
+def collect_trajectories(world, n=100):
     pass
 
-def visualize_trajectory():
+def visualize_trajectory(traj):
     pass
