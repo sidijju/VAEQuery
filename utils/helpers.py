@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import torch
-from visualize import visualize_behavior
 from storage.vae_storage import VAEStorage
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -21,7 +20,8 @@ class FeatureExtractor:
 
     #update driver.py with num_features if change in number of features
 
-    def __init__(self):
+    def __init__(self, args):
+        self.args = args
         pass
 
     def featurize(self, traj):

@@ -18,6 +18,9 @@ class GridWorld(gym.Env):
         self.observation_space = spaces.Box(low=0, high=self.size-1, shape=(2,))
         self.action_space = spaces.Discrete(5)
 
+         # list of possible tasks (exclude tasks that are trivial)
+        self.possible_tasks = [(i, j) for i in range(self.size) for j in range(self.size) if (i > 1 or j > 1)]
+
         self.task_dim = 2
         self.state_dim = 2
         self.action_dim = 1

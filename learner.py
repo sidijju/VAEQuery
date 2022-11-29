@@ -1,4 +1,4 @@
-from utils.helpers import collect_trajectories, collect_dataset, sample_gaussian
+from utils.helpers import collect_dataset, sample_gaussian
 from models import encoder, belief
 from query.simulate import SimulatedHuman
 from torch import optim, nn
@@ -6,19 +6,18 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 
-
 class Learner:
 
-    def __init__(self, args, world, policy):
+    def __init__(self, args, world, policy, exp_name="default"):
         self.args = args
         self.policy = policy
+        self.exp_name = exp_name
 
         # initialize simulated true human
         self.human = SimulatedHuman(args)
 
         # get dataset
-        trajectories = collect_trajectories(world, n=args.precollect_num)
-        self.dataset = collect_dataset(trajectories, self.human)
+        self.dataset = collect_dataset(args, world, self.human)
 
          # initialize encoder network
         self.encoder = encoder.Encoder(args)
@@ -69,13 +68,13 @@ class Learner:
             plt.xlabel("Iterations")
             plt.ylabel("MSE")
             plt.title("Belief vs. True Reward Error")
-            plt.savefig(self.policy.vis_directory + "error")
+            plt.savefig(self.policy.vis_directory + self.exp_name + "/error")
 
             plt.plot(losses)
             plt.xlabel("Iterations")
             plt.ylabel("CE Error")
             plt.title("Query Distribution vs. Answer Error")
-            plt.savefig(self.policy.vis_directory + "loss")
+            plt.savefig(self.policy.vis_directory + self.exp_name + "loss")
             
         print("########### TRAINING ###########")
         # alternate between training encoder and training policy
