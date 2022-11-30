@@ -25,7 +25,7 @@ def args(rest_args):
                         help='how many trajectories to pre-collect before training begins')
     parser.add_argument('--buffer_size', type=int, default=1000,
                         help='how many trajectories to keep in VAE buffer')
-    parser.add_argument('--pretrain_len', type=int, default=5000,
+    parser.add_argument('--pretrain_len', type=int, default=1000,
                         help='how many iterations to pretrain the vae')
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--batchsize', type=int, default=25,

@@ -9,6 +9,8 @@ class Encoder(nn.Module):
     def __init__(self, args):
         super(Encoder, self).__init__()
 
+        self.args = args
+
         # fc layer before passing into GRU units
         # TODO: add option to make multiple layers
         self.input_dim = args.query_size * args.num_features
@@ -34,5 +36,5 @@ class Encoder(nn.Module):
         output = F.relu(output)
         return output
 
-    def init_hidden(self, batchsize):
-        self.hidden = torch.zeros((batchsize, self.hidden_dim))
+    def init_hidden(self):
+        self.hidden = torch.zeros((1, self.args.batchsize, self.hidden_dim))

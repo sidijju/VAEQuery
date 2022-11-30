@@ -29,8 +29,9 @@ class Learner:
         params = list(self.encoder.parameters()) + list(self.belief.parameters())
         self.optimizer = optim.Adam(params, lr=args.lr)
 
-        # define loss function for VAE
+        # define loss functions for VAE
         self.loss = nn.CrossEntropyLoss()
+        self.mse = nn.MSELoss()
 
         # directory for plots
         self.dir = self.exp_name + "/" + self.policy.vis_directory
@@ -49,6 +50,7 @@ class Learner:
 
             self.optimizer.zero_grad()
 
+            self.encoder.init_hidden()
             latents = self.encoder(query_seqs)
 
             # latents should have the output at every timestep for the input sequence
@@ -66,10 +68,15 @@ class Learner:
             assert beliefs.shape == (self.args.batchsize, self.args.num_features)
 
             # compute inputs as the SimulatedHuman response to the query at each timestep
-            humans = [SimulatedHuman(self.args, w=belief) for belief in beliefs]
-            inputs = None
+            sims = [SimulatedHuman(self.args, w=belief) for belief in beliefs]
 
-            assert inputs.shape == (self.args.sequence_length, self.args.batchsize, self.args.query_size)
+            ## ensure we can backpropagate through this
+            inputs = torch.zeros((self.args.sequence_length, self.args.batchsize, self.args.query_size))
+            for t in range(self.args.sequence_length):
+                for b in range(self.args.batchsize):
+                    inputs[t][b] = sims[t].response_dist(query_seqs[t][b])
+
+            assert answer_seqs.shape == inputs.shape
 
             loss = self.loss(inputs, answer_seqs)
             assert loss.shape == ()
@@ -77,10 +84,16 @@ class Learner:
             loss.backward()
             self.optimizer.step()
 
-            mse = nn.MSELoss(beliefs, [self.human.w for _ in range(self.args.batchsize)])
-            alignment = [np.dot(b, self.human.w)/(np.linalg.norm(b)*np.linalg.norm(self.human.w)) for b in beliefs].mean()
+            true_humans = [self.human.w for _ in range(self.args.batchsize)]
+            true_humans = torch.stack(true_humans)
 
-            print("Iteration %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (i, loss, mse, alignment))
+            mse = self.mse(beliefs, true_humans)
+            alignment = torch.tensor([self.human.alignment(sims[i]) for i in range(self.args.batchsize)]).mean()
+
+            if i % 100 == 0:
+                print("Iteration %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (i, loss, mse, alignment))
+                print(inputs[0])
+                print(answer_seqs[0])
 
             errors.append(mse)
             losses.append(loss)

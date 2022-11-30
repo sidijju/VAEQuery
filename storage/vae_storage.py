@@ -52,9 +52,12 @@ class VAEStorage:
             # select the rollouts we want and append to sequences
             query_seqs.append(self.queries[idx, :])
             answers = self.answers[idx].to(int)
-            answer_seqs.append([F.one_hot(a, num_classes=self.args.query_size) for a in answers])
+            answer_seqs.append(answers)
 
         query_seqs = torch.stack(query_seqs)
+        answer_seqs = torch.stack(answer_seqs)
+        answer_seqs = torch.squeeze(F.one_hot(answer_seqs, num_classes=self.args.query_size))
+        answer_seqs = answer_seqs.to(float)
 
         return query_seqs, answer_seqs
 
@@ -68,6 +71,6 @@ class VAEStorage:
             self.buffer_len += 1
 
         # add to larger buffer
-        self.queries[self.idx] = torch.tensor(query)
-        self.answers[self.idx] = torch.tensor(answer)
+        self.queries[self.idx] = query
+        self.answers[self.idx] = answer
         self.idx += 1

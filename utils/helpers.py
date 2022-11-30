@@ -75,10 +75,12 @@ def collect_dataset(args, world, human):
             traj = collect_random_trajectory(world)
             featurized = feature_extractor.featurize(traj)
             query.extend(featurized)
-            
+        
         assert len(query) == args.query_size * args.num_features
         
+        query = torch.tensor(query)
         answer = human.response(query)
+        answer = torch.tensor(answer)
         dataset.insert(query, answer)
     
     return dataset

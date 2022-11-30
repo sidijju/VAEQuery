@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 class SimulatedHuman:
     def __init__(self, args, w=None):
@@ -10,19 +11,19 @@ class SimulatedHuman:
         if w is None:
             w = np.random.random(self.num_features)
             w /= w.sum()
-        self.w = w
+            w = torch.tensor(w)
+        self.w = w.to(torch.float64)
 
     def response(self, query):
         return self.sample(self.response_dist(query))
 
     def response_dist(self, query):
-        dist = np.zeros(self.dist_size)
+        dist = torch.zeros(self.dist_size)
         for t in range(self.dist_size):
             start = t * self.num_features
             traj = query[start:start+self.num_features]
-            dist[t] = np.exp(1/self.temperature * np.dot(self.w, traj))
+            dist[t] = torch.exp(1/self.temperature * torch.dot(traj.to(torch.float64), self.w))
         dist /= dist.sum()
-
         assert abs(dist.sum() - 1) < 1e-4
         return dist
 
@@ -34,3 +35,6 @@ class SimulatedHuman:
         for i in range(len(dist)):
             if rand <= dist[i]:
                 return i
+
+    def alignment(self, other):
+        return torch.dot(other.w, self.w)/(torch.linalg.norm(other.w)*torch.linalg.norm(self.w))
