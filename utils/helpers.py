@@ -63,7 +63,7 @@ def collect_random_trajectory(world):
 
     return obs, actions, next_obs, rews
 
-def collect_dataset(args, world, human):
+def collect_dataset(args, world):
     feature_extractor = FeatureExtractor(args)
     dataset = VAEStorage(args)
 
@@ -79,8 +79,6 @@ def collect_dataset(args, world, human):
         assert len(query) == args.query_size * args.num_features
         
         query = torch.tensor(query)
-        answer = human.response(query)
-        answer = torch.tensor(answer)
-        dataset.insert(query, answer)
+        dataset.insert(query)
     
     return dataset

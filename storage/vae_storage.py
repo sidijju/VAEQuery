@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+from query.simulate import SimulatedHuman
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -22,7 +23,6 @@ class VAEStorage:
         self.idx = 0
 
         self.queries = torch.zeros((self.buffer_size, args.query_size * args.num_features))
-        self.answers = torch.zeros((self.buffer_size, 1))
         
     def get_batch(self, batchsize=5):
         # get batchsize queries from dataset
@@ -33,8 +33,12 @@ class VAEStorage:
         # select random indices for trajectories
         idx = np.random.choice(range(self.buffer_len), size, replace=False)
 
+        true_humans = []
+        for _ in range(batchsize):
+            true_humans.append(SimulatedHuman(self.args))
+
         # select the rollouts we want
-        return self.queries[idx, :], self.answers[idx]
+        return true_humans, self.queries[idx, :]
 
     def get_batch_seq(self, batchsize=5, seqlength=10):
         # get batchsize sequences queries from dataset
@@ -42,24 +46,36 @@ class VAEStorage:
 
         size = min(self.buffer_len, batchsize)
 
-        query_seqs = []
-        answer_seqs = []
+        # generate true humans for each query sequence
+        true_humans = []
+        for _ in range(batchsize):
+            true_humans.append(SimulatedHuman(self.args))
 
+        # generate query sequences
+        query_seqs = []
         for _ in range(seqlength):
             # select random indices for trajectories
             idx = np.random.choice(range(self.buffer_len), size, replace=False)
 
             # select the rollouts we want and append to sequences
             query_seqs.append(self.queries[idx, :])
-            answers = self.answers[idx].to(int)
-            answer_seqs.append(answers)
+
+        # generate answer sequences
+        answer_seqs = []
+        for i in range(batchsize):
+            answer_seq = []
+            true_human = true_humans[i]
+            for t in range(seqlength):
+                answer_seq.append(true_human.response(query_seqs[t][i]))
+            answer_seqs.append(torch.tensor(answer_seq))
 
         query_seqs = torch.stack(query_seqs)
         answer_seqs = torch.stack(answer_seqs)
+        answer_seqs = torch.movedim(answer_seqs, 1, 0)
 
-        return query_seqs, answer_seqs
+        return true_humans, query_seqs, answer_seqs
 
-    def insert(self, query, answer):
+    def insert(self, query):
 
         # ring buffer, replace at beginning
         if self.idx >= self.buffer_size:
@@ -70,5 +86,4 @@ class VAEStorage:
 
         # add to larger buffer
         self.queries[self.idx] = query
-        self.answers[self.idx] = answer
         self.idx += 1

@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from torch.nn.functional import normalize
 
 class SimulatedHuman:
     def __init__(self, args, w=None):
@@ -11,10 +12,8 @@ class SimulatedHuman:
         if w is None:
             w = np.random.random(self.num_features)
             w = torch.tensor(w)
-            w /= w.sum()
-        elif abs(w.sum() - 1) < 1e-3:
-            w = w/w.sum()
-        self.w = w.to(torch.float64)
+            
+        self.w = normalize(w, dim=0).to(torch.float64)
 
     def response(self, query):
         return self.sample(self.response_dist(query))
@@ -39,4 +38,4 @@ class SimulatedHuman:
                 return i
 
     def alignment(self, other):
-        return torch.dot(other.w, self.w)/(torch.linalg.norm(other.w)*torch.linalg.norm(self.w))
+        return abs(torch.dot(other.w, self.w)/(torch.linalg.norm(other.w)*torch.linalg.norm(self.w)))

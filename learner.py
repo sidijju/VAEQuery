@@ -13,11 +13,8 @@ class Learner:
         self.policy = policy
         self.exp_name = exp_name
 
-        # initialize simulated true human
-        self.human = SimulatedHuman(args)
-
         # get dataset
-        self.dataset = collect_dataset(args, world, self.human)
+        self.dataset = collect_dataset(args, world)
 
          # initialize encoder network
         self.encoder = encoder.Encoder(args)
@@ -46,7 +43,7 @@ class Learner:
         # only train encoder - do not use policy
         print("######### PRE TRAINING #########")
         for i in range(self.args.pretrain_len):
-            query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+            true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
             self.optimizer.zero_grad()
 
@@ -84,11 +81,14 @@ class Learner:
             loss.backward()
             self.optimizer.step()
 
-            true_humans = [self.human.w for _ in range(self.args.batchsize)]
-            true_humans = torch.stack(true_humans)
+            belief_ws = [sim.w for sim in sims]
+            belief_ws = torch.stack(belief_ws)
 
-            mse = self.mse(beliefs, true_humans)
-            alignment = torch.tensor([self.human.alignment(sims[i]) for i in range(self.args.batchsize)]).mean()
+            true_ws = [true_human.w for true_human in true_humans]
+            true_ws = torch.stack(true_ws)
+
+            mse = self.mse(belief_ws, true_ws)
+            alignment = torch.tensor([true_humans[i].alignment(sims[i]) for i in range(self.args.batchsize)]).mean()
 
             if i % 100 == 0:
                 print("Iteration %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (i, loss, mse, alignment))
