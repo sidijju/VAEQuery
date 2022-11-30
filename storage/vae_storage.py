@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -33,6 +34,26 @@ class VAEStorage:
         # select the rollouts we want
         return self.queries[idx, :, :], self.answers[idx, :]
 
+    def get_batch_seq(self, batchsize=5, seqlength=10):
+        # get batchsize sequences queries from dataset
+        # queries consist of query_size trajectories plus the response
+
+        size = min(self.buffer_len, batchsize)
+
+        query_seqs = []
+        answer_seqs = []
+
+        for _ in range(seqlength):
+            # select random indices for trajectories
+            idx = np.random.choice(range(self.buffer_len), size, replace=False)
+
+            # select the rollouts we want and append to sequences
+            query_seqs.append(self.queries[idx, :, :])
+            answers = self.answers[idx, :]
+            answer_seqs.append([F.one_hot(a, num_classes=self.args.query_size) for a in answers])
+
+        return query_seqs, answer_seqs
+
     def insert(self, query, answer):
 
         # ring buffer, replace at beginning
@@ -43,6 +64,6 @@ class VAEStorage:
             self.buffer_len += 1
 
         # add to larger buffer
-        self.queries[self.idx] = query
-        self.answers[self.idx] = answer
+        self.queries[self.idx] = torch.tensor(query)
+        self.answers[self.idx] = torch.tensor(answer)
         self.idx += 1

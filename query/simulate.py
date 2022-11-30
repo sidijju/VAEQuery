@@ -20,7 +20,8 @@ class SimulatedHuman:
             start = t * self.num_features
             traj = query[start:start+self.num_features]
             dist[t] = np.exp(1/self.temperature * np.dot(self.w, traj))
-
+        dist /= dist.sum()
+        
         assert abs(dist.sum() - 1) < 1e-4
         return dist
 

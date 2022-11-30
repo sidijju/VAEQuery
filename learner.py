@@ -2,7 +2,7 @@ from utils.helpers import collect_dataset, sample_gaussian, makedir
 from models import encoder, belief
 from query.simulate import SimulatedHuman
 from torch import optim, nn
-import torch.nn.functional as F
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -27,7 +27,7 @@ class Learner:
 
         # initialize optimizer for belief and encoder networks
         params = list(self.encoder.parameters()) + list(self.belief.parameters())
-        self.optimizer = optim.Adam(params, lr=args.lr, momentum=0.9)
+        self.optimizer = optim.Adam(params, lr=args.lr)
 
         # define loss function for VAE
         self.loss = nn.CrossEntropyLoss()
@@ -42,20 +42,32 @@ class Learner:
         losses = []
 
         # pre-train encoder with untrained policy
+        # only train encoder - do not use policy
         print("######### PRE TRAINING #########")
         for i in range(self.args.pretrain_len):
-            queries, answers = self.dataset.get_batch(batchsize=self.args.batchsize)
-            targets = [F.one_hot(a, num_classes=self.args.query_size) for a in answers]
+            query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
             self.optimizer.zero_grad()
 
-            latents = self.encoder(queries)
-            mus, logvars = self.belief(latents)
-            beliefs = [sample_gaussian(mus[i], logvars[i]) for i in range(len(mus))]
-            inputs = [SimulatedHuman(beliefs[i]).response_dist(queries[i]) for i in range(len(beliefs))]
+            latents = self.encoder(query_seqs)
 
-            loss = self.loss(inputs, targets)
+            print(latents.shape())
+            assert latents.shape() == ()
+
+            mus, logvars = self.belief(latents)
+
+            print(mus.shape())
+            print(logvars.shape())
+            assert mus.shape() == ()
+
+            beliefs = [sample_gaussian(mus[i], logvars[i]) for i in range(len(mus))]
+
+            # compute inputs as the SimulatedHuman response to the query at each timestep
+            inputs = None
+
+            loss = self.loss(inputs, answer_seqs)
             assert loss.shape == ()
+
             loss.backward()
             self.optimizer.step()
 

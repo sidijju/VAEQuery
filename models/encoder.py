@@ -11,23 +11,28 @@ class Encoder(nn.Module):
 
         # fc layer before passing into GRU units
         # TODO: add option to make multiple layers
-        input_dim = args.query_size * args.num_features
-        self.fc_before = nn.Linear(input_dim, args.fc_dim)
+        self.input_dim = args.query_size * args.num_features
+        self.hidden_dim = args.gru_hidden_size
+        self.fc_before = nn.Linear(self.input_dim, args.fc_dim)
 
         # RNN functionality
         self.gru = nn.GRU(input_size=args.fc_dim,
-                          hidden_size=args.gru_hidden_size,
+                          hidden_size=self.hidden_dim,
                           num_layers=args.gru_hidden_layers)
 
         # fc layers after the RNN
         # TODO: add option to make multiple layers
-        self.output = nn.Linear(args.gru_hidden_size, args.latent_dim)
+        self.output = nn.Linear(self.hidden_dim, args.latent_dim)
 
-    def forward(self, query, hidden=None):
-        
+        self.hidden = None
+
+    def forward(self, query):
         # run through layers
         output = self.fc_before(query)
-        output, _ = self.gru(output, hidden)
+        output, self.hidden = self.gru(output, self.hidden)
         output = self.output(output)
-
+        output = F.relu(output)
         return output
+
+    def init_hidden(self, batchsize):
+        self.hidden = torch.zeros((batchsize, self.hidden_dim))

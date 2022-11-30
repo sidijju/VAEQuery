@@ -25,7 +25,7 @@ class FeatureExtractor:
         pass
 
     def featurize(self, traj):
-        features = np.zeros_like(self.args.num_features)
+        features = np.zeros((self.args.num_features))
         obs, actions, next_obs, rews = traj
         
         if self.args.env_type == 'gridworld':
@@ -48,15 +48,15 @@ def collect_random_trajectory(world):
     world.reset()
 
     # horizon number of (s, a, s', r) tuples
-    obs = np.zeros((world.horizon, world.state_dim))
-    actions = np.zeros((world.horizon, world.action_dim))
-    next_obs = np.zeros((world.horizon, world.state_dim))
-    rews = np.zeros((world.horizon, world.state_dim))
+    obs = torch.zeros((world.horizon, world.state_dim))
+    actions = torch.zeros((world.horizon, world.action_dim))
+    next_obs = torch.zeros((world.horizon, world.state_dim))
+    rews = torch.zeros((world.horizon, 1))
 
     for i in range(world.horizon):
-        obs[i] = world.state
+        obs[i] = torch.tensor(world.state)
         action = world.action_space.sample()
-        actions[i] = action
+        actions[i] = torch.tensor(action)
         next_ob, rew, _, _ = world.step(action)
         next_obs[i] = next_ob
         rews[i] = rew
@@ -75,6 +75,8 @@ def collect_dataset(args, world, human):
             traj = collect_random_trajectory(world)
             featurized = feature_extractor.featurize(traj)
             query.extend(featurized)
+            
+        assert len(query) == args.query_size * args.num_features
         
         answer = human.response(query)
         dataset.insert(query, answer)
