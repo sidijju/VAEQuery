@@ -71,10 +71,10 @@ class Learner:
             sims = [SimulatedHuman(self.args, w=belief) for belief in beliefs]
 
             ## ensure we can backpropagate through this
-            inputs = torch.zeros((self.args.sequence_length, self.args.batchsize, self.args.query_size))
-            for t in range(self.args.sequence_length):
+            inputs = torch.zeros((self.args.sequence_length-1, self.args.batchsize, self.args.query_size))
+            for t in range(self.args.sequence_length-1):
                 for b in range(self.args.batchsize):
-                    inputs[t][b] = sims[t].response_dist(query_seqs[t][b])
+                    inputs[t][b] = sims[t].response_dist(query_seqs[t+1][b])
 
             inputs = inputs.flatten(end_dim=1)
             targets = answer_seqs.flatten(end_dim=1).squeeze()
