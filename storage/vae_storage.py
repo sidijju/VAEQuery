@@ -56,8 +56,6 @@ class VAEStorage:
 
         query_seqs = torch.stack(query_seqs)
         answer_seqs = torch.stack(answer_seqs)
-        answer_seqs = torch.squeeze(F.one_hot(answer_seqs, num_classes=self.args.query_size))
-        answer_seqs = answer_seqs.to(float)
 
         return query_seqs, answer_seqs
 

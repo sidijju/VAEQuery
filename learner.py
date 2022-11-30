@@ -76,9 +76,10 @@ class Learner:
                 for b in range(self.args.batchsize):
                     inputs[t][b] = sims[t].response_dist(query_seqs[t][b])
 
-            assert answer_seqs.shape == inputs.shape
+            inputs = inputs.flatten(end_dim=1)
+            targets = answer_seqs.flatten(end_dim=1).squeeze()
 
-            loss = self.loss(inputs, answer_seqs)
+            loss = self.loss(inputs, targets)
             assert loss.shape == ()
 
             loss.backward()
@@ -92,8 +93,6 @@ class Learner:
 
             if i % 100 == 0:
                 print("Iteration %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (i, loss, mse, alignment))
-                print(inputs[0])
-                print(answer_seqs[0])
 
             errors.append(mse)
             losses.append(loss)
