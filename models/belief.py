@@ -26,6 +26,7 @@ class Belief(nn.Module):
         output = query
         for l in self.layers:
             output = l(output)
+            output = F.relu(output)
 
         mu = self.fc_mu(output)
         logvar = self.fc_logvar(output)

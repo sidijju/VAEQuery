@@ -14,6 +14,9 @@ def sample_gaussian(mu, logvar):
     norm_sample = torch.randn_like(stddev)
     return norm_sample.mul(stddev).add(mu)
 
+def distance(x1, x2, y1, y2):
+    return np.sqrt((x1 - x2)**2 + (y1-y2)**2)
+
 class FeatureExtractor:
 
     #return features from a trajectory
@@ -29,18 +32,24 @@ class FeatureExtractor:
         obs, actions, next_obs, rews = traj
         
         if self.args.env_type == 'gridworld':
-            #feature 1 - total reward
+            #feature 0 - total reward
             features[0] = rews.sum()
 
-            #feature 2 - number of actions that aren't stay
+            #feature 1 - number of actions that aren't stay
             features[1] = len(actions) - np.count_nonzero(actions == 4)
 
-            #feature 3 - 
+            #feature 2 - average distance from bottom left
+            features[2] = sum([distance(ob[0], 0, ob[1], 0) for ob in next_obs])/len(obs)
 
-            #feature 4 - 
+            #feature 3 - average distance from top right
+            features[3] = sum([distance(ob[0], self.args.grid_size, ob[1], self.args.grid_size) for ob in next_obs])/len(obs)
 
-            #feature 5 - 
-        
+            #feature 4 - average distance from bottom right
+            features[4] = sum([distance(ob[0], self.args.grid_size, ob[1], 0) for ob in next_obs])/len(obs)
+
+            #feature 5 - average distance from top left
+            features[5] = sum([distance(ob[0], 0, ob[1], self.args.grid_size) for ob in next_obs])/len(obs)
+
         return features
 
 

@@ -31,10 +31,13 @@ class Encoder(nn.Module):
     def forward(self, query, answer):
         input = torch.cat((query, answer.unsqueeze(-1)), 2)
         output = self.fc_input(input)
+        output = F.relu(output)
+
         output, self.hidden = self.gru(output, self.hidden)
+
         output = self.output(output)
         output = F.relu(output)
         return output
 
     def init_hidden(self):
-        self.hidden = torch.zeros((1, self.args.batchsize, self.hidden_dim))
+        self.hidden = torch.zeros((self.args.gru_hidden_layers, self.args.batchsize, self.hidden_dim))

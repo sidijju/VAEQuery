@@ -15,9 +15,9 @@ exp_name = args.exp_name
 
 if env == 'gridworld':
     args = gridworld.args(rargs)
-    args.num_features = 5
+    args.num_features = 6
     args.env_type = env
-    args.exp_name = str(time.time()) + "-" + exp_name
+    args.exp_name = exp_name
 
     if args.visualize:
         makedir("visualizations")  

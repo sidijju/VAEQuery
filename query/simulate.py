@@ -31,11 +31,12 @@ class SimulatedHuman:
     def sample(self, dist):
         for i in range(1, len(dist)):
             dist[i] += dist[i-1]
-            
+
         rand = np.random.random_sample()
         for i in range(len(dist)):
             if rand <= dist[i]:
                 return i
+        return len(dist)-1
 
     def alignment(self, other):
         return abs(torch.dot(other.w, self.w)/(torch.linalg.norm(other.w)*torch.linalg.norm(self.w)))
