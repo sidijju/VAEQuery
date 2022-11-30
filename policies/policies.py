@@ -2,7 +2,7 @@ import numpy as np
 
 class Policy:
     def __init__(self):
-        self.vis_directory = "visualizations/"
+        self.vis_directory = ""
 
     def run_policy(self, query):
         pass
@@ -13,7 +13,7 @@ class Policy:
 class RandomPolicy(Policy):
     def __init__(self):
         super().__init__()
-        self.vis_directory += "random/"
+        self.vis_directory = "random/"
 
     def run_policy(self, query):
         return np.random.randint(high=len(query))
@@ -21,7 +21,7 @@ class RandomPolicy(Policy):
 class GreedyPolicy(Policy):
     def __init__(self):
         super().__init__()
-        self.vis_directory += "greedy/"
+        self.vis_directory = "greedy/"
 
     def run_policy(self, query):
         # TODO
@@ -30,7 +30,7 @@ class GreedyPolicy(Policy):
 class RLPolicy(Policy):
     def __init__(self):
         super().__init__()
-        self.vis_directory += "rl/"
+        self.vis_directory = "rl/"
     
     def run_policy(self, query):
         # TODO

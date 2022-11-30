@@ -31,17 +31,17 @@ class Learner:
         self.mse = nn.MSELoss()
 
         # directory for plots
-        self.dir = self.exp_name + "/" + self.policy.vis_directory
-
-    def train(self, visualize=False):
-        
-        alignments = []
-        errors = []
-        losses = []
-
+        if self.args.visualize:
+            self.dir = "visualizations/" + self.exp_name + "/" + self.policy.vis_directory
+            makedir(dirname=self.dir)
+            
+    def train(self):
         # pre-train encoder with untrained policy
         # only train encoder - do not use policy
-        print("######### PRE TRAINING #########")
+        if self.args.verbose:
+            print("######### PRE TRAINING #########")
+            
+        losses = []
         for i in range(self.args.pretrain_len):
             true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
@@ -81,43 +81,86 @@ class Learner:
             loss.backward()
             self.optimizer.step()
 
-            belief_ws = [sim.w for sim in sims]
-            belief_ws = torch.stack(belief_ws)
+            if self.args.verbose and i % 100 == 0:
+                print("Iteration %2d: Loss = %.3f" % (i, loss))
 
-            true_ws = [true_human.w for true_human in true_humans]
-            true_ws = torch.stack(true_ws)
-
-            mse = self.mse(belief_ws, true_ws)
-            alignment = torch.tensor([true_humans[i].alignment(sims[i]) for i in range(self.args.batchsize)]).mean()
-
-            if i % 100 == 0:
-                print("Iteration %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (i, loss, mse, alignment))
-
-            errors.append(mse)
-            losses.append(loss)
-            alignments.append(alignment)
+            losses.append(loss.item())
 
         # save plots for errors and losses after pre training
-        if visualize:
-            makedir(dirname=self.dir)
-
-            plt.plot(errors)
-            plt.xlabel("Iterations")
-            plt.ylabel("MSE")
-            plt.title("Belief vs. True Reward Error")
-            plt.savefig(self.dir + "error")
-
+        if self.args.visualize:
             plt.plot(losses)
             plt.xlabel("Iterations")
             plt.ylabel("CE Error")
             plt.title("Query Distribution vs. Answer Error")
             plt.savefig(self.dir + "loss")
+            plt.close()
 
-            plt.plot(alignments)
-            plt.xlabel("Iterations")
-            plt.ylabel("Alignment")
-            plt.title("Reward Alignment")
-            plt.savefig(self.dir + "alignment")
+        # evaluate encoder on test batch
+        if self.args.verbose:
+            print("######### PRE TRAINING - EVALUATION #########")
+
+        with torch.no_grad():
+            true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+
+            self.encoder.init_hidden()
+            latents = self.encoder(query_seqs)
+
+            # latents should have the output at every timestep for the input sequence
+            assert latents.shape == (self.args.sequence_length, self.args.batchsize, self.args.latent_dim)
+
+            # pass latents into belief network
+            mus, logvars = self.belief(latents)
+
+            assert mus.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
+            assert logvars.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
+
+            beliefs = []
+            for t in range(self.args.sequence_length):
+                beliefs_t = []
+                for b in range(self.args.batchsize):
+                    beliefs_t.append(sample_gaussian(mus[t][b], logvars[t][b]))
+                beliefs.append(torch.stack(beliefs_t))
+            beliefs = torch.stack(beliefs)
+
+            assert beliefs.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
+
+            mses = []
+            alignments = []
+
+            true_ws = [true_human.w for true_human in true_humans]
+            true_ws = torch.stack(true_ws)
+
+            for t in range(self.args.sequence_length):
+
+                sims = [SimulatedHuman(self.args, w=belief) for belief in beliefs[t]]
+
+                belief_ws = [sim.w for sim in sims]
+                belief_ws = torch.stack(belief_ws)
+
+                mse = self.mse(belief_ws, true_ws)
+                alignment = torch.tensor([true_humans[i].alignment(sims[i]) for i in range(self.args.batchsize)]).mean()
+
+                mses.append(mse)
+                alignments.append(alignment)
+
+                if self.args.verbose:
+                    print("Query %2d: MSE = %.3f, Alignment = %.3f" % (t, mse, alignment))
+
+            # save plots for errors after pre training
+            if self.args.visualize:
+                plt.plot(mses)
+                plt.xlabel("Queries")
+                plt.ylabel("MSE")
+                plt.title("Pretraining Evaluation - Reward Error")
+                plt.savefig(self.dir + "eval-error")
+                plt.close()
+
+                plt.plot(alignments)
+                plt.xlabel("Queries")
+                plt.ylabel("Alignment")
+                plt.title("Pretraining Evaluation - Reward Alignment")
+                plt.savefig(self.dir + "eval-alignment")
+                plt.close()
             
         print("########### TRAINING ###########")
         # alternate between training encoder and training policy

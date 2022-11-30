@@ -10,34 +10,35 @@ def args(rest_args):
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--log_dir', type=Path, default=Path('/logs'))
     parser.add_argument('--save_interval', type=int, default=10)
+    parser.add_argument('--verbose', dest='verbose', action='store_true')
+    parser.set_defaults(verbose=False)
+    parser.add_argument('--visualize', dest='visualize', action='store_true')
+    parser.set_defaults(visualize=False)
 
     parser.add_argument('--temperature', type=int, default=10,
                         help='Boltzmann rationality temperature')
-    parser.add_argument('--encoder_spi', type=int, default=1000,
-                        help='number of training step per iteration for the encoder')
-    parser.add_argument('--policy_spi', type=int, default=1000,
-                        help='number of training step per iteration for the policy')
 
     ##### POLICY #####
 
-    #TODO
     parser.add_argument('--query_size', type=int, default=2,
                         help='number of trajectories to choose from in one query')
+    parser.add_argument('--policy_spi', type=int, default=1000,
+                        help='number of training step per iteration for the policy')
 
     ##### VAE #####
-    parser.add_argument('--precollect_num', type=int, default=100,
+    parser.add_argument('--encoder_spi', type=int, default=1000,
+                        help='number of training step per iteration for the encoder')
+    parser.add_argument('--precollect_num', type=int, default=5000,
                         help='how many trajectories to pre-collect before training begins')
-    parser.add_argument('--buffer_size', type=int, default=1000,
+    parser.add_argument('--buffer_size', type=int, default=10000,
                         help='how many trajectories to keep in VAE buffer')
-    parser.add_argument('--pretrain_len', type=int, default=1000,
+    parser.add_argument('--pretrain_len', type=int, default=5000,
                         help='how many iterations to pretrain the vae')
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--batchsize', type=int, default=25,
+    parser.add_argument('--batchsize', type=int, default=50,
                         help='how many trajectories to use for VAE update')
     parser.add_argument('--sequence_length', type=int, default=20,
                         help='how long a query sequence is for RNN')
-    parser.add_argument('--max_trajectory_len', type=int, default=15,
-                        help='maximum length of trajectory')
     parser.add_argument('--fc_dim', type=int, default=1, 
                         help='dimensionality of fc input to GRU')
     parser.add_argument('--gru_hidden_layers', type=int, default=1, 
@@ -54,5 +55,7 @@ def args(rest_args):
 
     parser.add_argument('--grid_size', type=int, default=5,
                         help='size of grid')
+    parser.add_argument('--max_trajectory_len', type=int, default=15,
+                        help='maximum length of trajectory')
 
     return parser.parse_args(rest_args)

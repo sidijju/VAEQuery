@@ -69,7 +69,10 @@ def collect_dataset(args, world):
 
     assert args.precollect_num > args.batchsize
 
-    for _ in range(args.precollect_num):
+    if args.verbose:
+        print("########### COLLECTING DATASET ###########")
+
+    for i in range(args.precollect_num):
         query = []
         for _ in range(args.query_size):
             traj = collect_random_trajectory(world)
@@ -80,5 +83,8 @@ def collect_dataset(args, world):
         
         query = torch.tensor(query)
         dataset.insert(query)
+
+        if args.verbose and i % 1000 == 0:
+            print("Collected %2d queries" % (i))
     
     return dataset
