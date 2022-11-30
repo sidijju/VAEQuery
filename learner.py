@@ -2,7 +2,7 @@ from utils.helpers import collect_dataset, sample_gaussian, makedir
 from models import encoder, belief
 from query.simulate import SimulatedHuman
 from torch import optim, nn
-
+import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -51,19 +51,25 @@ class Learner:
 
             latents = self.encoder(query_seqs)
 
-            print(latents.shape())
-            assert latents.shape() == ()
+            # latents should have the output at every timestep for the input sequence
+            assert latents.shape == (self.args.sequence_length, self.args.batchsize, self.args.latent_dim)
 
-            mus, logvars = self.belief(latents)
+            # pass latent from last timestep into belief network
+            mus, logvars = self.belief(latents[-1, :, :])
 
-            print(mus.shape())
-            print(logvars.shape())
-            assert mus.shape() == ()
+            assert mus.shape == (self.args.batchsize, self.args.num_features)
+            assert logvars.shape == (self.args.batchsize, self.args.num_features)
 
-            beliefs = [sample_gaussian(mus[i], logvars[i]) for i in range(len(mus))]
+            beliefs = [sample_gaussian(mu, logvar) for mu, logvar in zip(mus, logvars)]
+            beliefs = torch.stack(beliefs)
+
+            assert beliefs.shape == (self.args.batchsize, self.args.num_features)
 
             # compute inputs as the SimulatedHuman response to the query at each timestep
+            humans = [SimulatedHuman(self.args, w=belief) for belief in beliefs]
             inputs = None
+
+            assert inputs.shape == (self.args.sequence_length, self.args.batchsize, self.args.query_size)
 
             loss = self.loss(inputs, answer_seqs)
             assert loss.shape == ()

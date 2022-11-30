@@ -10,6 +10,8 @@ class VAEStorage:
     
     def __init__(self, args):
 
+        self.args = args
+
         assert args.num_features > 0
 
         # max number of queries
@@ -32,7 +34,7 @@ class VAEStorage:
         idx = np.random.choice(range(self.buffer_len), size, replace=False)
 
         # select the rollouts we want
-        return self.queries[idx, :, :], self.answers[idx, :]
+        return self.queries[idx, :], self.answers[idx]
 
     def get_batch_seq(self, batchsize=5, seqlength=10):
         # get batchsize sequences queries from dataset
@@ -48,9 +50,11 @@ class VAEStorage:
             idx = np.random.choice(range(self.buffer_len), size, replace=False)
 
             # select the rollouts we want and append to sequences
-            query_seqs.append(self.queries[idx, :, :])
-            answers = self.answers[idx, :]
+            query_seqs.append(self.queries[idx, :])
+            answers = self.answers[idx].to(int)
             answer_seqs.append([F.one_hot(a, num_classes=self.args.query_size) for a in answers])
+
+        query_seqs = torch.stack(query_seqs)
 
         return query_seqs, answer_seqs
 

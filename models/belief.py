@@ -14,6 +14,7 @@ class Belief(nn.Module):
         curr = args.latent_dim
         for l in args.fc_layers:
             layers.append(nn.Linear(curr, l))
+            curr = l
         self.layers = layers
         # final layers to output normal distribution
         self.fc_mu = nn.Linear(curr, args.num_features)

@@ -1,14 +1,15 @@
 import numpy as np
 
 class SimulatedHuman:
-    def __init__(self, args):
+    def __init__(self, args, w=None):
         self.num_features = args.num_features
         self.dist_size = args.query_size
         self.temperature = args.temperature
 
-        # initialize true human reward
-        w = np.random.random(self.num_features)
-        w /= w.sum()
+        # initialize true human reward if not given
+        if w is None:
+            w = np.random.random(self.num_features)
+            w /= w.sum()
         self.w = w
 
     def response(self, query):
@@ -21,7 +22,7 @@ class SimulatedHuman:
             traj = query[start:start+self.num_features]
             dist[t] = np.exp(1/self.temperature * np.dot(self.w, traj))
         dist /= dist.sum()
-        
+
         assert abs(dist.sum() - 1) < 1e-4
         return dist
 
