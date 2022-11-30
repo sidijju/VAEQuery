@@ -77,7 +77,7 @@ class Learner:
                     inputs[t][b] = sims[t].response_dist(query_seqs[t+1][b])
 
             inputs = inputs.flatten(end_dim=1)
-            targets = answer_seqs.flatten(end_dim=1).squeeze()
+            targets = answer_seqs[1:, :].flatten(end_dim=1).squeeze()
 
             loss = self.loss(inputs, targets)
             assert loss.shape == ()
