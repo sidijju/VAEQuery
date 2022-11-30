@@ -67,7 +67,7 @@ class VAEStorage:
             true_human = true_humans[i]
             for t in range(seqlength):
                 answer_seq.append(true_human.response(query_seqs[t][i]))
-            answer_seqs.append(torch.tensor(answer_seq))
+            answer_seqs.append(torch.tensor(answer_seq).to(torch.long))
 
         query_seqs = torch.stack(query_seqs)
         answer_seqs = torch.stack(answer_seqs)

@@ -39,7 +39,7 @@ def args(rest_args):
                         help='how many trajectories to use for VAE update')
     parser.add_argument('--sequence_length', type=int, default=20,
                         help='how long a query sequence is for RNN')
-    parser.add_argument('--fc_dim', type=int, default=1, 
+    parser.add_argument('--fc_dim', type=int, default=16, 
                         help='dimensionality of fc input to GRU')
     parser.add_argument('--gru_hidden_layers', type=int, default=1, 
                         help='number of hidden layers')

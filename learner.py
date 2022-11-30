@@ -48,7 +48,7 @@ class Learner:
             self.optimizer.zero_grad()
 
             self.encoder.init_hidden()
-            latents = self.encoder(query_seqs)
+            latents = self.encoder(query_seqs, answer_seqs)
 
             # latents should have the output at every timestep for the input sequence
             assert latents.shape == (self.args.sequence_length, self.args.batchsize, self.args.latent_dim)
@@ -64,7 +64,7 @@ class Learner:
 
             assert beliefs.shape == (self.args.batchsize, self.args.num_features)
 
-            # compute inputs as the SimulatedHuman response to the query at the last timestep
+            # compute inputs as the SimulatedHuman at the last timestep's response to the query at each timestep
             sims = [SimulatedHuman(self.args, w=belief) for belief in beliefs]
 
             inputs = torch.zeros((self.args.sequence_length-1, self.args.batchsize, self.args.query_size))
@@ -83,13 +83,12 @@ class Learner:
 
             if self.args.verbose and i % 100 == 0:
                 print("Iteration %2d: Loss = %.3f" % (i, loss))
-
-            losses.append(loss.item())
+                losses.append(loss.item())
 
         # save plots for errors and losses after pre training
         if self.args.visualize:
             plt.plot(losses)
-            plt.xlabel("Iterations")
+            plt.xlabel("Iterations (100s)")
             plt.ylabel("CE Error")
             plt.title("Query Distribution vs. Answer Error")
             plt.savefig(self.dir + "loss")
@@ -103,7 +102,7 @@ class Learner:
             true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
             self.encoder.init_hidden()
-            latents = self.encoder(query_seqs)
+            latents = self.encoder(query_seqs, answer_seqs)
 
             # latents should have the output at every timestep for the input sequence
             assert latents.shape == (self.args.sequence_length, self.args.batchsize, self.args.latent_dim)
