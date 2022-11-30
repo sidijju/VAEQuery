@@ -10,8 +10,10 @@ class SimulatedHuman:
         # initialize true human reward if not given
         if w is None:
             w = np.random.random(self.num_features)
-            w /= w.sum()
             w = torch.tensor(w)
+            w /= w.sum()
+        elif abs(w.sum() - 1) < 1e-3:
+            w = w/w.sum()
         self.w = w.to(torch.float64)
 
     def response(self, query):

@@ -67,10 +67,9 @@ class Learner:
 
             assert beliefs.shape == (self.args.batchsize, self.args.num_features)
 
-            # compute inputs as the SimulatedHuman response to the query at each timestep
+            # compute inputs as the SimulatedHuman response to the query at the last timestep
             sims = [SimulatedHuman(self.args, w=belief) for belief in beliefs]
 
-            ## ensure we can backpropagate through this
             inputs = torch.zeros((self.args.sequence_length-1, self.args.batchsize, self.args.query_size))
             for t in range(self.args.sequence_length-1):
                 for b in range(self.args.batchsize):
@@ -125,6 +124,16 @@ class Learner:
         # will also have to modify way we input to encoder to
         # take advantage of RNN structure
         # TODO
+
+        for n in range(self.args.num_iters):
+            
+            # train encoder
+            for _ in range(self.args.encoder_spi):
+                # use policy in here
+                pass
+
+            # train policy
+            self.policy.train_policy(n=self.args.policy_spi)
        
 
         
