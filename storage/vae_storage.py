@@ -34,7 +34,7 @@ class VAEStorage:
         idx = np.random.choice(range(self.buffer_len), size, replace=False)
 
         true_rewards = torch.rand((batchsize, self.args.num_features))
-        true_rewards = true_rewards / (torch.sum(true_rewards, 1).unsqueeze(-1))
+        true_rewards = true_rewards / (torch.norm(true_rewards, 1).unsqueeze(-1))
 
         queries = self.queries[idx, :]
 
@@ -57,7 +57,7 @@ class VAEStorage:
 
         # generate true humans for each query sequence
         true_rewards = torch.rand((batchsize, self.args.num_features))
-        true_rewards = true_rewards / (torch.sum(true_rewards, 1).unsqueeze(-1))
+        true_rewards = true_rewards / (torch.linalg.norm(true_rewards, dim=1).unsqueeze(-1))
 
         # generate query sequences
         query_seqs = []

@@ -10,7 +10,7 @@ def makedir(dirname = "visualizations"):
         os.mkdir(dirname)
 
 def distance(x1, x2, y1, y2):
-    return np.sqrt((x1 - x2)**2 + (y1-y2)**2)
+    return np.sqrt((x1-x2)**2 + (y1-y2)**2)
 
 class FeatureExtractor:
 
@@ -46,7 +46,6 @@ class FeatureExtractor:
             features[5] = sum([distance(ob[0], 0, ob[1], self.args.grid_size) for ob in next_obs])/len(obs)
 
         return features
-
 
 def collect_random_trajectory(world):
     world.reset()
@@ -88,7 +87,7 @@ def collect_dataset(args, world):
         query = torch.tensor(query)
         dataset.insert(query)
 
-        if args.verbose and i % 1000 == 0:
-            print("Collected %2d queries" % (i))
+        if args.verbose and (i+1) % 1000 == 0:
+            print("Collected %2d queries" % (i+1))
     
     return dataset

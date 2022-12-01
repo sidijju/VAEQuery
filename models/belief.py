@@ -23,9 +23,8 @@ class Belief(nn.Module):
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5*logvar)
         eps = torch.randn_like(std)
-        belief = mu + eps*std
-        belief = belief - torch.min(belief, -1, keepdim=True)[0]
-        belief = belief / torch.sum(belief, -1, keepdim=True)
+        belief = eps.mul(std).add_(mu)
+        belief = belief / torch.linalg.norm(belief, dim=-1).unsqueeze(-1)
         return belief
 
     def forward(self, query):

@@ -75,25 +75,30 @@ class Learner:
             print("######### PRE TRAINING #########")
             
         losses = []
-        for i in range(self.args.pretrain_len):
+
+        #test if model can learn on only one true reward
+        if self.args.batchsize == 1:
             true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
+        for i in range(self.args.pretrain_len):
+            if self.args.batchsize > 1:
+                true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+
             self.optimizer.zero_grad()
-
             self.encoder.init_hidden()
-            latents = self.encoder(query_seqs, answer_seqs)
 
-            # latents should have the output at every timestep for the input sequence
+            # get latents from queries and answers
+            latents = self.encoder(query_seqs, answer_seqs)
             assert latents.shape == (self.args.sequence_length, self.args.batchsize, self.args.latent_dim)
 
             # pass latent from all timesteps into belief network
             beliefs, _, _ = self.belief(latents)
-
             assert beliefs.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
 
             # compute predicted response at each timestep for each sequence
             inputs = response_dist(self.args, query_seqs, beliefs)
 
+            # get inputs and targets for cross entropy loss
             inputs = inputs.view(-1, self.args.query_size)
             targets = answer_seqs.view(-1)
 
@@ -101,11 +106,10 @@ class Learner:
             assert loss.shape == ()
 
             loss.backward()
-
             self.optimizer.step()
 
-            if self.args.verbose and i % 100 == 0:
-                print("Iteration %2d: Loss = %.3f" % (i, loss))
+            if self.args.verbose and (i+1) % 100 == 0:
+                print("Iteration %2d: Loss = %.3f" % (i+1, loss))
                 losses.append(loss.item())
 
         # save plots for errors and losses after pre training
@@ -121,8 +125,12 @@ class Learner:
         if self.args.verbose:
             print("######### PRE TRAINING - EVALUATION #########")
 
+        if self.args.batchsize == 1:
+            print(true_humans[0])
+            
         with torch.no_grad():
-            true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+            if self.args.batchsize > 1:
+                true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
             self.encoder.init_hidden()
             latents = self.encoder(query_seqs, answer_seqs)
@@ -139,6 +147,8 @@ class Learner:
             alignments = []
 
             for t in range(self.args.sequence_length):
+
+                print(beliefs[t, :, :].data)
 
                 mse = self.mse(beliefs[t, :, :], true_humans)
                 align = alignment(beliefs[t, :, :], true_humans).mean()

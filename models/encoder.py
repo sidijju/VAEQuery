@@ -32,10 +32,9 @@ class Encoder(nn.Module):
         input = torch.cat((query, answer), 2)
         output = self.fc_input(input)
         output = F.relu(output)
-
         output, self.hidden = self.gru(output, self.hidden)
-
         output = self.output(output)
+        
         return output
 
     def init_hidden(self):
