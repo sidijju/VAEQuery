@@ -23,12 +23,15 @@ class Belief(nn.Module):
     def reparameterize(self, mu, logvar):
         std = torch.exp(0.5*logvar)
         eps = torch.randn_like(std)
-        return mu + eps*std
+        belief = mu + eps*std
+        belief = belief - torch.min(belief, -1, keepdim=True)[0]
+        belief = belief / torch.sum(belief, -1, keepdim=True)
+        return belief
 
     def forward(self, query):
         
         # run through layers
-        output = query.clone()
+        output = query
         for l in self.layers:
             output = l(output)
             output = F.relu(output)

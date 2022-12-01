@@ -8,6 +8,37 @@ from query.simulate import response_dist, alignment
 
 class Learner:
 
+    def plot_grad_flow(self, named_parameters, title=""):
+        from matplotlib.lines import Line2D
+        '''Plots the gradients flowing through different layers in the net during training.
+        Can be used for checking for possible gradient vanishing / exploding problems.
+        
+        Usage: Plug this function in Trainer class after loss.backwards() as 
+        "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
+        ave_grads = []
+        max_grads= []
+        layers = []
+        for n, p in named_parameters:
+            if(p.requires_grad) and ("bias" not in n):
+                layers.append(n)
+                ave_grads.append(p.grad.abs().mean())
+                max_grads.append(p.grad.abs().max())
+        plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
+        plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
+        plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
+        plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+        plt.xlim(left=0, right=len(ave_grads))
+        plt.ylim(bottom = -0.001, top=.02) # zoom in on the lower gradient regions
+        plt.xlabel("Layers")
+        plt.ylabel("average gradient")
+        plt.title("Gradient flow")
+        plt.grid(True)
+        plt.legend([Line2D([0], [0], color="c", lw=4),
+                    Line2D([0], [0], color="b", lw=4),
+                    Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
+        plt.savefig(title)
+        plt.close()
+
     def __init__(self, args, world, policy, exp_name="default"):
         self.args = args
         self.policy = policy
@@ -24,6 +55,7 @@ class Learner:
 
         # initialize optimizer for belief and encoder networks
         self.params = list(self.encoder.parameters()) + list(self.belief.parameters())
+        self.named_params = list(self.encoder.named_parameters()) + list(self.belief.named_parameters())
 
         self.optimizer = optim.Adam(self.params, lr=args.lr)
 
@@ -54,20 +86,22 @@ class Learner:
             # latents should have the output at every timestep for the input sequence
             assert latents.shape == (self.args.sequence_length, self.args.batchsize, self.args.latent_dim)
 
-            # pass latent from last timestep into belief network
+            # pass latent from all timesteps into belief network
             beliefs, _, _ = self.belief(latents)
 
             assert beliefs.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
 
             # compute predicted response at each timestep for each sequence
             inputs = response_dist(self.args, query_seqs, beliefs)
-            inputs = inputs.flatten(end_dim=1).squeeze()
-            targets = answer_seqs.flatten(end_dim=1).squeeze()
+
+            inputs = inputs.view(-1, self.args.query_size)
+            targets = answer_seqs.view(-1)
 
             loss = self.loss(inputs, targets)
             assert loss.shape == ()
 
             loss.backward()
+
             self.optimizer.step()
 
             if self.args.verbose and i % 100 == 0:

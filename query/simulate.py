@@ -3,7 +3,7 @@ import torch
 from torch.nn.functional import softmax
 
 def response_dist(args, query, w):
-    trajs = query.view(*query.shape[:-1], args.query_size, args.num_features)
+    trajs = torch.reshape(query, (*query.shape[:-1], args.query_size, args.num_features))
     trajs = torch.transpose(trajs, -1, -2)
     w = w.unsqueeze(-1)
     dist = torch.sum(trajs * w, dim=-2)

@@ -36,7 +36,6 @@ class Encoder(nn.Module):
         output, self.hidden = self.gru(output, self.hidden)
 
         output = self.output(output)
-        output = F.relu(output)
         return output
 
     def init_hidden(self):

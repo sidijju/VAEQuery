@@ -71,7 +71,7 @@ def collect_dataset(args, world):
     feature_extractor = FeatureExtractor(args)
     dataset = VAEStorage(args)
 
-    assert args.precollect_num > args.batchsize
+    assert args.precollect_num >= args.batchsize
 
     if args.verbose:
         print("########### COLLECTING DATASET ###########")

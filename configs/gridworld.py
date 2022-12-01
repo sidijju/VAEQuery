@@ -15,7 +15,7 @@ def args(rest_args):
     parser.add_argument('--visualize', dest='visualize', action='store_true')
     parser.set_defaults(visualize=False)
 
-    parser.add_argument('--temperature', type=int, default=10,
+    parser.add_argument('--temperature', type=int, default=0.01,
                         help='Boltzmann rationality temperature')
 
     ##### POLICY #####
@@ -26,22 +26,24 @@ def args(rest_args):
                         help='number of training step per iteration for the policy')
 
     ##### VAE #####
+    parser.add_argument('--pretrain_encoder_spi', type=int, default=10000, 
+                        help='number of training steps per iteration for the encoder during pretraining')
     parser.add_argument('--encoder_spi', type=int, default=1000,
-                        help='number of training step per iteration for the encoder')
+                        help='number of training steps per iteration for the encoder')
     parser.add_argument('--precollect_num', type=int, default=5000,
                         help='how many trajectories to pre-collect before training begins')
     parser.add_argument('--buffer_size', type=int, default=10000,
                         help='how many trajectories to keep in VAE buffer')
     parser.add_argument('--pretrain_len', type=int, default=5000,
                         help='how many iterations to pretrain the vae')
-    parser.add_argument('--lr', type=float, default=1)
+    parser.add_argument('--lr', type=float, default=.01)
     parser.add_argument('--batchsize', type=int, default=100,
                         help='how many queries to use for VAE update')
     parser.add_argument('--sequence_length', type=int, default=20,
                         help='how long a query sequence is for RNN')
     parser.add_argument('--fc_dim', type=int, default=16, 
                         help='dimensionality of fc input to GRU')
-    parser.add_argument('--gru_hidden_layers', type=int, default=5, 
+    parser.add_argument('--gru_hidden_layers', type=int, default=1, 
                         help='number of hidden layers')
     parser.add_argument('--gru_hidden_size', type=int, default=64, 
                         help='size of hidden layers')
@@ -49,7 +51,6 @@ def args(rest_args):
                         help='dimensionality of latent space')
     parser.add_argument('--fc_layers', type=list, default=[16, 32, 64], 
                         help='fc layers for VAE')
-    
 
     ##### ENVIRONMENT #####
 
