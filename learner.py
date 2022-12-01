@@ -106,6 +106,24 @@ class Learner:
             assert loss.shape == ()
 
             loss.backward()
+
+
+            def getBack(var_grad_fn):
+                print(var_grad_fn)
+                for n in var_grad_fn.next_functions:
+                    if n[0]:
+                        try:
+                            tensor = getattr(n[0], 'variable')
+                            print(n[0])
+                            print('Tensor with grad found:', tensor)
+                            print(' - gradient:', tensor.grad)
+                            print()
+                        except AttributeError as e:
+                            getBack(n[0])
+            getBack(loss.grad_fn)
+
+            assert 1 == 0
+
             self.optimizer.step()
 
             if self.args.verbose and (i+1) % 100 == 0:

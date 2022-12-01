@@ -21,10 +21,11 @@ class Belief(nn.Module):
         self.fc_logvar = nn.Linear(curr, args.num_features)
 
     def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5*logvar)
-        eps = torch.randn_like(std)
-        belief = eps.mul(std).add_(mu)
-        belief = belief / torch.linalg.norm(belief, dim=-1).unsqueeze(-1)
+        #std = torch.exp(0.5*logvar)
+        #eps = torch.randn_like(std)
+        #belief = eps.mul(std).add_(mu)
+        #belief = belief / torch.linalg.norm(belief, dim=-1).unsqueeze(-1)
+        belief = mu / torch.linalg.norm(mu, dim=-1).unsqueeze(-1)
         return belief
 
     def forward(self, query):
