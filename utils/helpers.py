@@ -9,11 +9,6 @@ def makedir(dirname = "visualizations"):
     if not os.path.exists(dirname):
         os.mkdir(dirname)
 
-def sample_gaussian(mu, logvar):
-    stddev = torch.exp(0.5 * logvar)
-    norm_sample = torch.randn_like(stddev)
-    return norm_sample.mul(stddev).add(mu)
-
 def distance(x1, x2, y1, y2):
     return np.sqrt((x1 - x2)**2 + (y1-y2)**2)
 

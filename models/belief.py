@@ -20,10 +20,15 @@ class Belief(nn.Module):
         self.fc_mu = nn.Linear(curr, args.num_features)
         self.fc_logvar = nn.Linear(curr, args.num_features)
 
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return mu + eps*std
+
     def forward(self, query):
         
         # run through layers
-        output = query
+        output = query.clone()
         for l in self.layers:
             output = l(output)
             output = F.relu(output)
@@ -31,4 +36,6 @@ class Belief(nn.Module):
         mu = self.fc_mu(output)
         logvar = self.fc_logvar(output)
 
-        return mu, logvar
+        belief = self.reparameterize(mu, logvar)
+
+        return belief, mu, logvar

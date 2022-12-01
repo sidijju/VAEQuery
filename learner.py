@@ -1,10 +1,10 @@
-from utils.helpers import collect_dataset, sample_gaussian, makedir
+from utils.helpers import collect_dataset, makedir
 from models import encoder, belief
-from query.simulate import SimulatedHuman
 from torch import optim, nn
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+from query.simulate import response_dist, alignment
 
 class Learner:
 
@@ -23,8 +23,9 @@ class Learner:
         self.belief = belief.Belief(args)
 
         # initialize optimizer for belief and encoder networks
-        params = list(self.encoder.parameters()) + list(self.belief.parameters())
-        self.optimizer = optim.Adam(params, lr=args.lr)
+        self.params = list(self.encoder.parameters()) + list(self.belief.parameters())
+
+        self.optimizer = optim.Adam(self.params, lr=args.lr)
 
         # define loss functions for VAE
         self.loss = nn.CrossEntropyLoss()
@@ -54,26 +55,14 @@ class Learner:
             assert latents.shape == (self.args.sequence_length, self.args.batchsize, self.args.latent_dim)
 
             # pass latent from last timestep into belief network
-            mus, logvars = self.belief(latents[-1, :, :])
+            beliefs, _, _ = self.belief(latents)
 
-            assert mus.shape == (self.args.batchsize, self.args.num_features)
-            assert logvars.shape == (self.args.batchsize, self.args.num_features)
+            assert beliefs.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
 
-            beliefs = [sample_gaussian(mu, logvar) for mu, logvar in zip(mus, logvars)]
-            beliefs = torch.stack(beliefs)
-
-            assert beliefs.shape == (self.args.batchsize, self.args.num_features)
-
-            # compute inputs as the SimulatedHuman at the last timestep's response to the query at each timestep
-            sims = [SimulatedHuman(self.args, w=belief) for belief in beliefs]
-
-            inputs = torch.zeros((self.args.sequence_length-1, self.args.batchsize, self.args.query_size))
-            for t in range(self.args.sequence_length-1):
-                for b in range(self.args.batchsize):
-                    inputs[t][b] = sims[t].response_dist(query_seqs[t+1][b])
-
-            inputs = inputs.flatten(end_dim=1)
-            targets = answer_seqs[1:, :].flatten(end_dim=1).squeeze()
+            # compute predicted response at each timestep for each sequence
+            inputs = response_dist(self.args, query_seqs, beliefs)
+            inputs = inputs.flatten(end_dim=1).squeeze()
+            targets = answer_seqs.flatten(end_dim=1).squeeze()
 
             loss = self.loss(inputs, targets)
             assert loss.shape == ()
@@ -108,42 +97,23 @@ class Learner:
             assert latents.shape == (self.args.sequence_length, self.args.batchsize, self.args.latent_dim)
 
             # pass latents into belief network
-            mus, logvars = self.belief(latents)
-
-            assert mus.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
-            assert logvars.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
-
-            beliefs = []
-            for t in range(self.args.sequence_length):
-                beliefs_t = []
-                for b in range(self.args.batchsize):
-                    beliefs_t.append(sample_gaussian(mus[t][b], logvars[t][b]))
-                beliefs.append(torch.stack(beliefs_t))
-            beliefs = torch.stack(beliefs)
+            beliefs, _, _ = self.belief(latents)
 
             assert beliefs.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
 
             mses = []
             alignments = []
 
-            true_ws = [true_human.w for true_human in true_humans]
-            true_ws = torch.stack(true_ws)
-
             for t in range(self.args.sequence_length):
 
-                sims = [SimulatedHuman(self.args, w=belief) for belief in beliefs[t]]
-
-                belief_ws = [sim.w for sim in sims]
-                belief_ws = torch.stack(belief_ws)
-
-                mse = self.mse(belief_ws, true_ws)
-                alignment = torch.tensor([true_humans[i].alignment(sims[i]) for i in range(self.args.batchsize)]).mean()
+                mse = self.mse(beliefs[t, :, :], true_humans)
+                align = alignment(beliefs[t, :, :], true_humans).mean()
 
                 mses.append(mse)
-                alignments.append(alignment)
+                alignments.append(align)
 
                 if self.args.verbose:
-                    print("Query %2d: MSE = %.3f, Alignment = %.3f" % (t, mse, alignment))
+                    print("Query %2d: MSE = %.3f, Alignment = %.3f" % (t, mse, align))
 
             # save plots for errors after pre training
             if self.args.visualize:

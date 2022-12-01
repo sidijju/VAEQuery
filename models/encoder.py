@@ -29,7 +29,7 @@ class Encoder(nn.Module):
         self.hidden = None
 
     def forward(self, query, answer):
-        input = torch.cat((query, answer.unsqueeze(-1)), 2)
+        input = torch.cat((query, answer), 2)
         output = self.fc_input(input)
         output = F.relu(output)
 

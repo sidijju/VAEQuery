@@ -34,7 +34,7 @@ def args(rest_args):
                         help='how many trajectories to keep in VAE buffer')
     parser.add_argument('--pretrain_len', type=int, default=5000,
                         help='how many iterations to pretrain the vae')
-    parser.add_argument('--lr', type=float, default=0.01)
+    parser.add_argument('--lr', type=float, default=1)
     parser.add_argument('--batchsize', type=int, default=100,
                         help='how many queries to use for VAE update')
     parser.add_argument('--sequence_length', type=int, default=20,

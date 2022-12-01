@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-from query.simulate import SimulatedHuman
+from query.simulate import response_dist
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -33,12 +33,21 @@ class VAEStorage:
         # select random indices for trajectories
         idx = np.random.choice(range(self.buffer_len), size, replace=False)
 
-        true_humans = []
-        for _ in range(batchsize):
-            true_humans.append(SimulatedHuman(self.args))
+        true_rewards = torch.rand((batchsize, self.args.num_features))
+        true_rewards = true_rewards / (torch.sum(true_rewards, 1).unsqueeze(-1))
+
+        queries = self.queries[idx, :]
+
+        dists = response_dist(self.args, queries, true_rewards)
+        answers = []
+        for b in range(batchsize):
+            answers.append(torch.multinomial(dists[b], 1))
+        answers = torch.stack(answers)
+
+        assert 1 == 0
 
         # select the rollouts we want
-        return true_humans, self.queries[idx, :]
+        return true_rewards, queries, answers
 
     def get_batch_seq(self, batchsize=5, seqlength=10):
         # get batchsize sequences queries from dataset
@@ -47,9 +56,8 @@ class VAEStorage:
         size = min(self.buffer_len, batchsize)
 
         # generate true humans for each query sequence
-        true_humans = []
-        for _ in range(batchsize):
-            true_humans.append(SimulatedHuman(self.args))
+        true_rewards = torch.rand((batchsize, self.args.num_features))
+        true_rewards = true_rewards / (torch.sum(true_rewards, 1).unsqueeze(-1))
 
         # generate query sequences
         query_seqs = []
@@ -59,21 +67,18 @@ class VAEStorage:
 
             # select the rollouts we want and append to sequences
             query_seqs.append(self.queries[idx, :])
+        query_seqs = torch.stack(query_seqs)
 
         # generate answer sequences
+        # don't require answers to have gradient so this is okay
+        dists = response_dist(self.args, query_seqs, true_rewards)
         answer_seqs = []
-        for i in range(batchsize):
-            answer_seq = []
-            true_human = true_humans[i]
-            for t in range(seqlength):
-                answer_seq.append(true_human.response(query_seqs[t][i]))
-            answer_seqs.append(torch.tensor(answer_seq).to(torch.long))
-
-        query_seqs = torch.stack(query_seqs)
+        for t in range(seqlength):
+            answer_seq = torch.multinomial(dists[t], 1)
+            answer_seqs.append(answer_seq)
         answer_seqs = torch.stack(answer_seqs)
-        answer_seqs = torch.movedim(answer_seqs, 1, 0)
 
-        return true_humans, query_seqs, answer_seqs
+        return true_rewards, query_seqs, answer_seqs
 
     def insert(self, query):
 
