@@ -1,4 +1,4 @@
-from utils.helpers import collect_dataset, makedir
+from utils.helpers import makedir
 from models import encoder
 from torch import optim, nn
 import torch
@@ -8,13 +8,13 @@ from query.simulate import response_dist, alignment
 
 class Learner:
 
-    def __init__(self, args, world, policy, exp_name="default"):
+    def __init__(self, args, dataset, policy):
         self.args = args
         self.policy = policy
-        self.exp_name = exp_name
+        self.exp_name = args.exp_name
 
         # get dataset
-        self.dataset = collect_dataset(args, world)
+        self.dataset = dataset
 
          # initialize encoder network
         self.encoder = encoder.Encoder(args)
@@ -30,8 +30,8 @@ class Learner:
         if self.args.visualize:
             self.dir = "visualizations/" + self.exp_name + "/" + self.policy.vis_directory
             makedir(dirname=self.dir)
-            
-    def train(self):
+
+    def pretrain(self):
         # pre-train encoder with untrained policy
         # only train encoder - do not use policy
         if self.args.verbose:
@@ -42,7 +42,7 @@ class Learner:
         # test if model can learn on only one true reward
         # same reward used for testing and training
         if self.args.batchsize == 1:
-            true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+            true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=1, seqlength=self.args.sequence_length)
 
         for i in range(self.args.pretrain_len):
             if self.args.batchsize > 1:
@@ -78,7 +78,6 @@ class Learner:
             if self.args.verbose and (i+1) % 100 == 0:
                 print("Iteration %2d: Loss = %.3f" % (i + 1, loss))
                 
-
         # save plots for errors and losses after pre training
         if self.args.visualize:
             plt.plot(losses)
@@ -93,7 +92,6 @@ class Learner:
             print("######### PRE TRAINING - EVALUATION #########")
             
         with torch.no_grad():
-
             # when we're not doing a singular batch experiment, we select a different test batch
             if self.args.batchsize > 1:
                 true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
@@ -152,7 +150,14 @@ class Learner:
                 plt.savefig(self.dir + "eval-alignment")
                 plt.close()
             
-        print("########### TRAINING ###########")
+    def train(self):
+        # pretrain encoder if necessary
+        if self.args.pretrain_len > 0:
+            self.pretrain()
+
+        if self.args.verbose:
+            print("########### TRAINING ###########")
+
         # alternate between training encoder and training policy
         # will also have to modify way we input to encoder to
         # take advantage of RNN structure
