@@ -1,5 +1,5 @@
 from utils.helpers import collect_dataset, makedir
-from models import encoder, belief
+from models import encoder
 from torch import optim, nn
 import torch
 import numpy as np
@@ -7,37 +7,6 @@ import matplotlib.pyplot as plt
 from query.simulate import response_dist, alignment
 
 class Learner:
-
-    def plot_grad_flow(self, named_parameters, title=""):
-        from matplotlib.lines import Line2D
-        '''Plots the gradients flowing through different layers in the net during training.
-        Can be used for checking for possible gradient vanishing / exploding problems.
-        
-        Usage: Plug this function in Trainer class after loss.backwards() as 
-        "plot_grad_flow(self.model.named_parameters())" to visualize the gradient flow'''
-        ave_grads = []
-        max_grads= []
-        layers = []
-        for n, p in named_parameters:
-            if(p.requires_grad) and ("bias" not in n):
-                layers.append(n)
-                ave_grads.append(p.grad.abs().mean())
-                max_grads.append(p.grad.abs().max())
-        plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
-        plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
-        plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
-        plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
-        plt.xlim(left=0, right=len(ave_grads))
-        plt.ylim(bottom = -0.001, top=.02) # zoom in on the lower gradient regions
-        plt.xlabel("Layers")
-        plt.ylabel("average gradient")
-        plt.title("Gradient flow")
-        plt.grid(True)
-        plt.legend([Line2D([0], [0], color="c", lw=4),
-                    Line2D([0], [0], color="b", lw=4),
-                    Line2D([0], [0], color="k", lw=4)], ['max-gradient', 'mean-gradient', 'zero-gradient'])
-        plt.savefig(title)
-        plt.close()
 
     def __init__(self, args, world, policy, exp_name="default"):
         self.args = args
@@ -50,14 +19,8 @@ class Learner:
          # initialize encoder network
         self.encoder = encoder.Encoder(args)
 
-        # initialize belief network
-        self.belief = belief.Belief(args)
-
-        # initialize optimizer for belief and encoder networks
-        self.params = list(self.encoder.parameters()) + list(self.belief.parameters())
-        self.named_params = list(self.encoder.named_parameters()) + list(self.belief.named_parameters())
-
-        self.optimizer = optim.Adam(self.params, lr=args.lr)
+        # initialize optimizer for model
+        self.optimizer = optim.Adam(self.encoder.parameters(), lr=args.lr)
 
         # define loss functions for VAE
         self.loss = nn.CrossEntropyLoss()
@@ -83,60 +46,42 @@ class Learner:
         for i in range(self.args.pretrain_len):
             if self.args.batchsize > 1:
                 true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
-
-            self.optimizer.zero_grad()
-            self.encoder.init_hidden()
-
+            
             # get latents from queries and answers
-            latents = self.encoder(query_seqs, answer_seqs)
-            assert latents.shape == (self.args.sequence_length, self.args.batchsize, self.args.latent_dim)
+            hidden = self.encoder.init_hidden()
 
-            # pass latent from all timesteps into belief network
-            beliefs, _, _ = self.belief(latents)
-            assert beliefs.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
+            # manually handle hidden inputs for gru
+            # compute loss and backprop at each step in sequence
+            for t in range(self.args.sequence_length):
+                self.optimizer.zero_grad()
+                beliefs, hidden = self.encoder(query_seqs[t, :, :], answer_seqs[t, :], hidden)
+                hidden = hidden.detach()
 
-            # compute predicted response at each timestep for each sequence
-            inputs = response_dist(self.args, query_seqs, beliefs)
+                # compute predicted response at each timestep for each sequence
+                inputs = response_dist(self.args, query_seqs[t, :, :], beliefs)
 
-            # get inputs and targets for cross entropy loss
-            inputs = inputs.view(-1, self.args.query_size)
-            targets = answer_seqs.view(-1)
+                # get inputs and targets for cross entropy loss
+                inputs = inputs.view(-1, self.args.query_size)
+                targets = answer_seqs[t, :].view(-1)
 
-            loss = self.loss(inputs, targets)
-            assert loss.shape == ()
+                loss = self.loss(inputs, targets)
+                loss.backward()
 
-            loss.backward()
+                if (t+1) % self.args.sequence_length == 0:
+                    losses.append(loss.item())
 
+                self.optimizer.step()
 
-            def getBack(var_grad_fn):
-                print(var_grad_fn)
-                for n in var_grad_fn.next_functions:
-                    if n[0]:
-                        try:
-                            tensor = getattr(n[0], 'variable')
-                            print(n[0])
-                            print('Tensor with grad found:', tensor)
-                            print(' - gradient:', tensor.grad)
-                            print()
-                        except AttributeError as e:
-                            getBack(n[0])
-            getBack(loss.grad_fn)
-
-            assert 1 == 0
-
-            self.optimizer.step()
-
-            if self.args.verbose and (i+1) % 100 == 0:
-                print("Iteration %2d: Loss = %.3f" % (i+1, loss))
-                losses.append(loss.item())
+                if self.args.verbose and (i+1) % 100 == 0 and (t+1) % self.args.sequence_length == 0:
+                    print("Iteration %2d: Loss = %.3f" % (i + 1, loss))
 
         # save plots for errors and losses after pre training
         if self.args.visualize:
             plt.plot(losses)
-            plt.xlabel("Iterations (100s)")
+            plt.xlabel("Iterations")
             plt.ylabel("CE Error")
             plt.title("Query Distribution vs. Answer Error")
-            plt.savefig(self.dir + "loss")
+            plt.savefig(self.dir + "train-loss")
             plt.close()
 
         # evaluate encoder on test batch
@@ -150,35 +95,41 @@ class Learner:
             if self.args.batchsize > 1:
                 true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
-            self.encoder.init_hidden()
-            latents = self.encoder(query_seqs, answer_seqs)
-
-            # latents should have the output at every timestep for the input sequence
-            assert latents.shape == (self.args.sequence_length, self.args.batchsize, self.args.latent_dim)
-
-            # pass latents into belief network
-            beliefs, _, _ = self.belief(latents)
-
-            assert beliefs.shape == (self.args.sequence_length, self.args.batchsize, self.args.num_features)
-
+            test_losses = []
             mses = []
             alignments = []
-
+            hidden = self.encoder.init_hidden()
             for t in range(self.args.sequence_length):
+                beliefs, hidden = self.encoder(query_seqs[t, :, :], answer_seqs[t, :], hidden)
+                print(beliefs[0])
 
-                print(beliefs[t, :, :].data)
+                # compute predicted response at each timestep for each sequence
+                inputs = response_dist(self.args, query_seqs[t, :, :], beliefs)
 
-                mse = self.mse(beliefs[t, :, :], true_humans)
-                align = alignment(beliefs[t, :, :], true_humans).mean()
+                # get inputs and targets for cross entropy loss
+                inputs = inputs.view(-1, self.args.query_size)
+                targets = answer_seqs[t, :].view(-1)
 
+                loss = self.loss(inputs, targets)
+                mse = self.mse(beliefs, true_humans)
+                align = alignment(beliefs, true_humans).mean()
+
+                test_losses.append(loss)
                 mses.append(mse)
                 alignments.append(align)
 
                 if self.args.verbose:
-                    print("Query %2d: MSE = %.3f, Alignment = %.3f" % (t, mse, align))
+                    print("Query %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (t, loss, mse, align))
 
             # save plots for errors after pre training
             if self.args.visualize:
+                plt.plot(test_losses)
+                plt.xlabel("Queries")
+                plt.ylabel("CE Loss")
+                plt.title("Pretraining Evaluation - Loss")
+                plt.savefig(self.dir + "eval-loss")
+                plt.close()
+
                 plt.plot(mses)
                 plt.xlabel("Queries")
                 plt.ylabel("MSE")

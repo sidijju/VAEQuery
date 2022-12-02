@@ -70,7 +70,7 @@ class VAEStorage:
         query_seqs = torch.stack(query_seqs)
 
         # generate answer sequences
-        # don't require answers to have gradient so this is okay
+        # detach rewards to prevent gradients
         dists = response_dist(self.args, query_seqs, true_rewards)
         answer_seqs = []
         for t in range(seqlength):

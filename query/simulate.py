@@ -6,7 +6,7 @@ def response_dist(args, query, w):
     trajs = torch.reshape(query, (*query.shape[:-1], args.query_size, args.num_features))
     w = w.unsqueeze(-2)
     dist = torch.sum(trajs * w, dim=-1)
-    dist = softmax(dist * 1/args.temperature, dim=-1)
+    dist *= 1/args.temperature
     return dist
 
 def alignment(w1, w2):
