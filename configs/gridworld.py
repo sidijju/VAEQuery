@@ -15,7 +15,7 @@ def args(rest_args):
     parser.add_argument('--visualize', dest='visualize', action='store_true')
     parser.set_defaults(visualize=False)
 
-    parser.add_argument('--temperature', type=int, default=1,
+    parser.add_argument('--temperature', type=float, default=.9,
                         help='Boltzmann rationality temperature')
 
     ##### POLICY #####
@@ -28,11 +28,11 @@ def args(rest_args):
     ##### VAE #####
     parser.add_argument('--encoder_spi', type=int, default=1000,
                         help='number of training steps per iteration for the encoder')
-    parser.add_argument('--precollect_num', type=int, default=5000,
+    parser.add_argument('--precollect_num', type=int, default=1000,
                         help='how many trajectories to pre-collect before training begins')
     parser.add_argument('--buffer_size', type=int, default=10000,
                         help='how many trajectories to keep in VAE buffer')
-    parser.add_argument('--pretrain_len', type=int, default=1000,
+    parser.add_argument('--pretrain_len', type=int, default=500,
                         help='how many iterations to pretrain the vae')
     parser.add_argument('--lr', type=float, default=.01)
     parser.add_argument('--batchsize', type=int, default=100,
@@ -47,6 +47,8 @@ def args(rest_args):
                         help='size of hidden layers')
     parser.add_argument('--fc_layers', type=list, default=[16, 32, 64], 
                         help='fc layers for VAE')
+    parser.add_argument('--use_mu', dest='sample_belief', action='store_false')
+    parser.set_defaults(sample_belief=True)
 
     ##### ENVIRONMENT #####
 

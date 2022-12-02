@@ -26,8 +26,6 @@ class Encoder(nn.Module):
                           num_layers=args.gru_hidden_layers)
 
         # fc layers after the RNN
-        # TODO: add option to make multiple layers
-
         fc_layers = []
         curr = self.hidden_dim
         for l in args.fc_layers:
@@ -39,11 +37,13 @@ class Encoder(nn.Module):
         self.fc_logvar = nn.Linear(curr, args.num_features)
 
     def reparameterize(self, mu, logvar):
-        #std = torch.exp(0.5*logvar)
-        #eps = torch.randn_like(std)
-        #belief = eps.mul(std).add_(mu)
-        #belief = belief / torch.linalg.norm(belief, dim=-1).unsqueeze(-1)
-        belief = mu / torch.linalg.norm(mu, dim=-1).unsqueeze(-1)
+        if self.args.sample_belief:
+            std = torch.exp(0.5*logvar)
+            eps = torch.randn_like(std)
+            belief = eps.mul(std).add_(mu)
+            belief = belief / torch.linalg.norm(belief, dim=-1).unsqueeze(-1)
+        else:
+            belief = mu / torch.linalg.norm(mu, dim=-1).unsqueeze(-1)
         return belief
 
     def forward(self, query, answer, hidden):
@@ -54,7 +54,7 @@ class Encoder(nn.Module):
         output = F.relu(output)
 
         # run through gru
-        #output, hidden = self.gru(output, hidden)
+        output, hidden = self.gru(output, hidden)
 
         # run through fc layers
         for l in self.fc_layers:

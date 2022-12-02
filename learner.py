@@ -47,33 +47,32 @@ class Learner:
             if self.args.batchsize > 1:
                 true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
             
+            self.optimizer.zero_grad()
+
             # get latents from queries and answers
             hidden = self.encoder.init_hidden()
 
             # manually handle hidden inputs for gru
-            # compute loss and backprop at each step in sequence
             for t in range(self.args.sequence_length):
-                self.optimizer.zero_grad()
                 beliefs, hidden = self.encoder(query_seqs[t, :, :], answer_seqs[t, :], hidden)
                 hidden = hidden.detach()
 
-                # compute predicted response at each timestep for each sequence
-                inputs = response_dist(self.args, query_seqs[t, :, :], beliefs)
+            # compute predicted response at last timestep for each sequence
+            inputs = response_dist(self.args, query_seqs[-1, :, :], beliefs)
 
-                # get inputs and targets for cross entropy loss
-                inputs = inputs.view(-1, self.args.query_size)
-                targets = answer_seqs[t, :].view(-1)
+            # get inputs and targets for cross entropy loss
+            inputs = inputs.view(-1, self.args.query_size)
+            targets = answer_seqs[-1, :].view(-1)
 
-                loss = self.loss(inputs, targets)
-                loss.backward()
+            loss = self.loss(inputs, targets)
+            loss.backward()     
+            losses.append(loss.item())           
 
-                if (t+1) % self.args.sequence_length == 0:
-                    losses.append(loss.item())
+            self.optimizer.step()                
 
-                self.optimizer.step()
-
-                if self.args.verbose and (i+1) % 100 == 0 and (t+1) % self.args.sequence_length == 0:
-                    print("Iteration %2d: Loss = %.3f" % (i + 1, loss))
+            if self.args.verbose and (i+1) % 100 == 0:
+                print("Iteration %2d: Loss = %.3f" % (i + 1, loss))
+                
 
         # save plots for errors and losses after pre training
         if self.args.visualize:
@@ -101,7 +100,6 @@ class Learner:
             hidden = self.encoder.init_hidden()
             for t in range(self.args.sequence_length):
                 beliefs, hidden = self.encoder(query_seqs[t, :, :], answer_seqs[t, :], hidden)
-                print(beliefs[0])
 
                 # compute predicted response at each timestep for each sequence
                 inputs = response_dist(self.args, query_seqs[t, :, :], beliefs)
@@ -120,6 +118,8 @@ class Learner:
 
                 if self.args.verbose:
                     print("Query %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (t, loss, mse, align))
+
+            print(beliefs[0])
 
             # save plots for errors after pre training
             if self.args.visualize:
