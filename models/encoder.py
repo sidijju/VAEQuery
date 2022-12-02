@@ -48,7 +48,11 @@ class Encoder(nn.Module):
 
     def forward(self, query, answer, hidden):
         input_query = self.fc_input_query(query)
+        input_query = F.relu(input_query)
+
         input_answer = self.fc_input_answer(answer.to(torch.float32))
+        input_answer = F.relu(input_answer)
+        
         input = torch.cat((input_query, input_answer), 1)
         output = self.fc_input(input)
         output = F.relu(output)

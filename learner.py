@@ -39,7 +39,8 @@ class Learner:
             
         losses = []
 
-        #test if model can learn on only one true reward
+        # test if model can learn on only one true reward
+        # same reward used for testing and training
         if self.args.batchsize == 1:
             true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
@@ -51,20 +52,24 @@ class Learner:
 
             # get latents from queries and answers
             hidden = self.encoder.init_hidden()
+            loss = 0
 
-            # manually handle hidden inputs for gru
+            # manually handle hidden inputs for gru for sequence
             for t in range(self.args.sequence_length):
                 beliefs, hidden = self.encoder(query_seqs[t, :, :], answer_seqs[t, :], hidden)
                 hidden = hidden.detach()
 
-            # compute predicted response at last timestep for each sequence
-            inputs = response_dist(self.args, query_seqs[-1, :, :], beliefs)
+                # compute predicted response at timestep for each sequence
+                inputs = response_dist(self.args, query_seqs[t, :, :], beliefs)
 
-            # get inputs and targets for cross entropy loss
-            inputs = inputs.view(-1, self.args.query_size)
-            targets = answer_seqs[-1, :].view(-1)
+                # get inputs and targets for cross entropy loss
+                inputs = inputs.view(-1, self.args.query_size)
+                targets = answer_seqs[t, :].view(-1)
 
-            loss = self.loss(inputs, targets)
+                seq_loss = self.loss(inputs, targets)
+                loss += seq_loss
+            
+            loss /= self.args.sequence_length
             loss.backward()     
             losses.append(loss.item())           
 
@@ -86,11 +91,10 @@ class Learner:
         # evaluate encoder on test batch
         if self.args.verbose:
             print("######### PRE TRAINING - EVALUATION #########")
-
-        if self.args.batchsize == 1:
-            print(true_humans[0])
             
         with torch.no_grad():
+
+            # when we're not doing a singular batch experiment, we select a different test batch
             if self.args.batchsize > 1:
                 true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
@@ -98,6 +102,7 @@ class Learner:
             mses = []
             alignments = []
             hidden = self.encoder.init_hidden()
+
             for t in range(self.args.sequence_length):
                 beliefs, hidden = self.encoder(query_seqs[t, :, :], answer_seqs[t, :], hidden)
 
@@ -119,7 +124,10 @@ class Learner:
                 if self.args.verbose:
                     print("Query %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (t, loss, mse, align))
 
-            print(beliefs[0])
+            if self.args.batchsize == 1:
+                print("Reward Comparison")
+                print("True  ", true_humans[0].data)
+                print("Belief", beliefs[0].data)
 
             # save plots for errors after pre training
             if self.args.visualize:

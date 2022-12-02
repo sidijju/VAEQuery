@@ -15,7 +15,7 @@ def args(rest_args):
     parser.add_argument('--visualize', dest='visualize', action='store_true')
     parser.set_defaults(visualize=False)
 
-    parser.add_argument('--temperature', type=float, default=.9,
+    parser.add_argument('--temperature', type=float, default=1,
                         help='Boltzmann rationality temperature')
 
     ##### POLICY #####
@@ -32,7 +32,7 @@ def args(rest_args):
                         help='how many trajectories to pre-collect before training begins')
     parser.add_argument('--buffer_size', type=int, default=10000,
                         help='how many trajectories to keep in VAE buffer')
-    parser.add_argument('--pretrain_len', type=int, default=500,
+    parser.add_argument('--pretrain_len', type=int, default=1000,
                         help='how many iterations to pretrain the vae')
     parser.add_argument('--lr', type=float, default=.01)
     parser.add_argument('--batchsize', type=int, default=100,
