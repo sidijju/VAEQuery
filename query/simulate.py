@@ -2,6 +2,11 @@ import numpy as np
 import torch
 from torch.nn.functional import softmax
 
+def sample_dist(dist):
+    probs = softmax(dist, dim=-1)
+    sample = torch.multinomial(probs, 1)
+    return sample
+
 def response_dist(args, query, w):
     trajs = torch.reshape(query, (*query.shape[:-1], args.query_size, args.num_features))
     w = w.unsqueeze(-2)

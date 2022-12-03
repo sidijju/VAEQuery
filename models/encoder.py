@@ -53,7 +53,7 @@ class Encoder(nn.Module):
         input_answer = self.fc_input_answer(answer.to(torch.float32))
         input_answer = F.relu(input_answer)
         
-        input = torch.cat((input_query, input_answer), 1)
+        input = torch.cat((input_query, input_answer), -1)
         output = self.fc_input(input)
         output = F.relu(output)
 
@@ -67,12 +67,11 @@ class Encoder(nn.Module):
 
         # output belief distribution and belief sample
         mu = self.fc_mu(output)
-        mu = F.relu(mu)
         logvar = self.fc_logvar(output)
         belief = self.reparameterize(mu, logvar)
 
         return belief, hidden
 
-    def init_hidden(self):
-        hidden = torch.zeros((1, self.hidden_dim))
+    def init_hidden(self, batchsize):
+        hidden = torch.zeros((1, batchsize, self.hidden_dim))
         return hidden

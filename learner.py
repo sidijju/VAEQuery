@@ -4,7 +4,7 @@ from torch import optim, nn
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from query.simulate import response_dist, alignment
+from query.simulate import *
 
 class Learner:
 
@@ -34,6 +34,7 @@ class Learner:
         if self.args.one_reward:
             true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=1, seqlength=self.args.sequence_length)
             self.global_data = (true_humans, query_seqs, answer_seqs)
+            self.args.batchsize = 1
         # TODO remove above later
 
     def pretrain(self): 
@@ -54,16 +55,18 @@ class Learner:
             self.optimizer.zero_grad()
 
             # get latents from queries and answers
-            hidden = self.encoder.init_hidden()
+            hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
             loss = 0
 
             # manually handle hidden inputs for gru for sequence
             for t in range(self.args.sequence_length):
-                beliefs, hidden = self.encoder(query_seqs[t, :, :], answer_seqs[t, :], hidden)
+                queries, answers = query_seqs[t, :, :].unsqueeze(0), answer_seqs[t, :, :].unsqueeze(0)
+
+                beliefs, hidden = self.encoder(queries, answers, hidden)
                 hidden = hidden.detach()
 
                 # compute predicted response at timestep for each sequence
-                inputs = response_dist(self.args, query_seqs[t, :, :], beliefs)
+                inputs = response_dist(self.args, queries, beliefs)
 
                 # get inputs and targets for cross entropy loss
                 inputs = inputs.view(-1, self.args.query_size)
@@ -102,17 +105,20 @@ class Learner:
             # when we're not doing a singular batch experiment, we select a different test batch
             if self.args.one_reward:
                 true_humans, query_seqs, answer_seqs = self.global_data
+                true_humans = true_humans.unsqueeze(0)
             else:
                 true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
-
-            hidden = self.encoder.init_hidden()
+            hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
 
             for t in range(self.args.sequence_length):
-                beliefs, hidden = self.encoder(query_seqs[t, :, :], answer_seqs[t, :], hidden)
+                queries, answers = query_seqs[t, :, :].unsqueeze(0), answer_seqs[t, :, :].unsqueeze(0)
 
-                # compute predicted response at each timestep for each sequence
-                inputs = response_dist(self.args, query_seqs[t, :, :], beliefs)
+                beliefs, hidden = self.encoder(queries, answers, hidden)
+                hidden = hidden.detach()
+
+                # compute predicted response at timestep for each sequence
+                inputs = response_dist(self.args, queries, beliefs)
 
                 # get inputs and targets for cross entropy loss
                 inputs = inputs.view(-1, self.args.query_size)
@@ -172,7 +178,7 @@ class Learner:
             # same reward used for testing and training
             if self.args.one_reward:
                 true_humans, query_seqs, answer_seqs = self.global_data
-                queries, answers = query_seqs[0], answer_seqs[0]
+                queries, answers = query_seqs[0].unsqueeze(0), answer_seqs[0].unsqueeze(0)
             else:
                 true_humans, queries, answers = self.dataset.get_batch(batchsize=self.args.batchsize)
 
@@ -182,7 +188,7 @@ class Learner:
                 self.optimizer.zero_grad()
 
                 # initialize hidden and loss variables
-                hidden = self.encoder.init_hidden()
+                hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
                 loss = 0
 
                 # manually handle hidden inputs for gru for sequence
@@ -207,10 +213,13 @@ class Learner:
 
                     # get next queries
                     curr_queries = self.policy.run_policy(curr_queries, beliefs)
-
                     # get next answers (in the case of an actual human, would be replaced with labeling step)
                     answer_dist = response_dist(self.args, curr_queries, true_humans)
-                    curr_answers = torch.multinomial(answer_dist, 1)
+                    curr_answers = sample_dist(answer_dist)
+
+                    # reshape to have sequence dim of 1
+                    curr_queries = curr_queries.unsqueeze(0)
+                    curr_answers = curr_answers.unsqueeze(0)
                 
                 loss /= self.args.sequence_length
                 loss.backward()     
@@ -246,16 +255,20 @@ class Learner:
             # same reward used for testing and training
             if self.args.one_reward:
                 true_humans, query_seqs, answer_seqs = self.global_data
+                true_humans = true_humans.unsqueeze(0)
             else:
                 true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
-            hidden = self.encoder.init_hidden()
+            hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
 
             for t in range(self.args.sequence_length):
-                beliefs, hidden = self.encoder(query_seqs[t, :, :], answer_seqs[t, :], hidden)
+                queries, answers = query_seqs[t, :, :].unsqueeze(0), answer_seqs[t, :, :].unsqueeze(0)
+
+                # get beliefs and hidden
+                beliefs, hidden = self.encoder(queries, answers, hidden)
 
                 # compute predicted response at each timestep for each sequence
-                inputs = response_dist(self.args, query_seqs[t, :, :], beliefs)
+                inputs = response_dist(self.args, queries, beliefs)
 
                 # get inputs and targets for cross entropy loss
                 inputs = inputs.view(-1, self.args.query_size)
