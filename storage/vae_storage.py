@@ -46,7 +46,7 @@ class VAEStorage:
         dists = response_dist(self.args, queries, true_rewards)
         answers = []
         for b in range(batchsize):
-            answers.append(torch.multinomial(dists[b], 1))
+            answers.append(sample_dist(dists[b]))
         answers = torch.stack(answers)
         
         # select the rollouts we want

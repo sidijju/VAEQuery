@@ -48,9 +48,9 @@ class Learner:
              # test if model can learn on only one true reward
             # same reward used for testing and training
             if self.args.one_reward:
-                true_humans, query_seqs, answer_seqs = self.global_data
+                _, query_seqs, answer_seqs = self.global_data
             else:
-                true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+                _, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
             self.optimizer.zero_grad()
 
@@ -108,7 +108,8 @@ class Learner:
                 true_humans = true_humans.unsqueeze(0)
             else:
                 true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
-
+                true_humans = true_humans.unsqueeze(0)
+            
             hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
 
             for t in range(self.args.sequence_length):
@@ -192,8 +193,8 @@ class Learner:
                 loss = 0
 
                 # manually handle hidden inputs for gru for sequence
-                curr_queries = queries
-                curr_answers = answers
+                curr_queries = queries.unsqueeze(0)
+                curr_answers = answers.unsqueeze(0)
 
                 for _ in range(self.args.sequence_length):
 
@@ -258,6 +259,7 @@ class Learner:
                 true_humans = true_humans.unsqueeze(0)
             else:
                 true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+                true_humans = true_humans.unsqueeze(0)
 
             hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
 
