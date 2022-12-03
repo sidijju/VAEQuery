@@ -6,7 +6,7 @@ def args(rest_args):
 
     ##### GENERAL #####
 
-    parser.add_argument('--num_iters', type=int, default=10)
+    parser.add_argument('--num_iters', type=int, default=1000)
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--log_dir', type=Path, default=Path('/logs'))
     parser.add_argument('--save_interval', type=int, default=10)
@@ -14,6 +14,8 @@ def args(rest_args):
     parser.set_defaults(verbose=False)
     parser.add_argument('--visualize', dest='visualize', action='store_true')
     parser.set_defaults(visualize=False)
+    parser.add_argument('--one_reward', dest='one_reward', action='store_true')
+    parser.set_defaults(one_reward=False)
 
     parser.add_argument('--temperature', type=float, default=1,
                         help='Boltzmann rationality temperature')
@@ -22,17 +24,17 @@ def args(rest_args):
 
     parser.add_argument('--query_size', type=int, default=2,
                         help='number of trajectories to choose from in one query')
-    parser.add_argument('--policy_spi', type=int, default=1000,
-                        help='number of training step per iteration for the policy')
+    parser.add_argument('--policy_spi', type=int, default=1,
+                        help='number of training steps per iteration for the policy')
 
     ##### VAE #####
-    parser.add_argument('--encoder_spi', type=int, default=1000,
+    parser.add_argument('--encoder_spi', type=int, default=1,
                         help='number of training steps per iteration for the encoder')
     parser.add_argument('--precollect_num', type=int, default=1000,
                         help='how many trajectories to pre-collect before training begins')
     parser.add_argument('--buffer_size', type=int, default=10000,
                         help='how many trajectories to keep in VAE buffer')
-    parser.add_argument('--pretrain_len', type=int, default=1000,
+    parser.add_argument('--pretrain_iters', type=int, default=1000,
                         help='how many iterations to pretrain the vae')
     parser.add_argument('--lr', type=float, default=.01)
     parser.add_argument('--batchsize', type=int, default=100,

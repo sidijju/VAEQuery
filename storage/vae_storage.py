@@ -24,36 +24,31 @@ class VAEStorage:
 
         self.queries = torch.zeros((self.buffer_size, args.query_size * args.num_features))
         
-    def get_batch(self, batchsize=5):
-        # get batchsize queries from dataset
-        # queries consist of query_size trajectories plus the response
-
+    def get_random_queries(self, batchsize=5):
+         # select random indices for queries
         size = min(self.buffer_len, batchsize)
-
-        # select random indices for trajectories
         idx = np.random.choice(range(self.buffer_len), size, replace=False)
+        queries = self.queries[idx, :]
+        return queries
+   
+    def get_batch(self, batchsize=5):
+        # get batchsize queries and responses from dataset
+        queries = self.get_random_queries(batchsize=batchsize)
 
         true_rewards = torch.rand((batchsize, self.args.num_features))
         true_rewards = true_rewards / (torch.norm(true_rewards, 1).unsqueeze(-1))
-
-        queries = self.queries[idx, :]
 
         dists = response_dist(self.args, queries, true_rewards)
         answers = []
         for b in range(batchsize):
             answers.append(torch.multinomial(dists[b], 1))
         answers = torch.stack(answers)
-
-        assert 1 == 0
-
+        
         # select the rollouts we want
         return true_rewards, queries, answers
 
     def get_batch_seq(self, batchsize=5, seqlength=10):
         # get batchsize sequences queries from dataset
-        # queries consist of query_size trajectories plus the response
-
-        size = min(self.buffer_len, batchsize)
 
         # generate true humans for each query sequence
         true_rewards = torch.rand((batchsize, self.args.num_features))
@@ -62,11 +57,9 @@ class VAEStorage:
         # generate query sequences
         query_seqs = []
         for _ in range(seqlength):
-            # select random indices for trajectories
-            idx = np.random.choice(range(self.buffer_len), size, replace=False)
-
             # select the rollouts we want and append to sequences
-            query_seqs.append(self.queries[idx, :])
+            queries = self.get_random_queries(batchsize=batchsize)
+            query_seqs.append(queries)
         query_seqs = torch.stack(query_seqs)
 
         # generate answer sequences

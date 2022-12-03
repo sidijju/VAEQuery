@@ -67,6 +67,7 @@ class Encoder(nn.Module):
 
         # output belief distribution and belief sample
         mu = self.fc_mu(output)
+        mu = F.relu(mu)
         logvar = self.fc_logvar(output)
         belief = self.reparameterize(mu, logvar)
 

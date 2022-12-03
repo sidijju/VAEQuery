@@ -87,7 +87,7 @@ def collect_dataset(args, world):
         query = torch.tensor(query)
         dataset.insert(query)
 
-        if args.verbose and (i+1) % 1000 == 0:
+        if args.verbose and (i+1) % 200 == 0:
             print("Collected %2d queries" % (i+1))
     
     return dataset

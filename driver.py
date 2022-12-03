@@ -32,9 +32,9 @@ if args.visualize:
 
 #### set up learners for each policy ####
 
-rand_learner = Learner(args, dataset, RandomPolicy())
-#greedy_learner = Learner(args, dataset, GreedyPolicy()) TODO
-#rl_learner = Learner(args, dataset, RLPolicy()) TODO
+rand_learner = Learner(args, dataset, RandomPolicy)
+#greedy_learner = Learner(args, dataset, GreedyPolicy) TODO
+#rl_learner = Learner(args, dataset, RLPolicy) TODO
 
 #### run training for each policy ####
 
