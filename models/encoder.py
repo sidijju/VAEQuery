@@ -38,9 +38,10 @@ class Encoder(nn.Module):
 
     def reparameterize(self, mu, logvar):
         if self.args.sample_belief:
-            std = torch.exp(0.5*logvar)
+            std = torch.exp(0.5*logvar).repeat(self.args.m, 1, 1)
             eps = torch.randn_like(std)
-            belief = eps.mul(std).add_(mu)
+            belief = eps.mul(std).add_(mu.repeat(self.args.m, 1, 1))
+            belief = torch.mean(belief, dim=0)
             belief = belief / torch.linalg.norm(belief, dim=-1).unsqueeze(-1)
         else:
             belief = mu / torch.linalg.norm(mu, dim=-1).unsqueeze(-1)
