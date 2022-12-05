@@ -43,6 +43,8 @@ class Learner:
             print("######### PRE TRAINING #########")
             
         losses = []
+        # set model to train mode
+        self.encoder.train()
 
         for i in range(self.args.pretrain_iters):
             if self.args.one_reward:
@@ -52,16 +54,15 @@ class Learner:
             else:
                 true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
-            # get latents from queries and answers
+            # initialize hidden and loss variables
             hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
+            loss = 0
 
             # manually handle hidden inputs for gru for sequence
             for t in range(self.args.sequence_length):
-                self.optimizer.zero_grad()
                 queries, answers = query_seqs[t, :, :].unsqueeze(0), answer_seqs[t, :, :].unsqueeze(0)
 
                 beliefs, hidden = self.encoder(queries, answers, hidden)
-                hidden = hidden.detach()
 
                 # compute predicted response at timestep for each sequence
                 inputs = response_dist(self.args, queries, beliefs)
@@ -70,11 +71,13 @@ class Learner:
                 inputs = inputs.view(-1, self.args.query_size)
                 targets = answer_seqs[t, :].view(-1)
 
-                loss = self.loss(inputs, targets)
-                loss.backward()     
-                losses.append(loss.item())           
-
-                self.optimizer.step()       
+                loss += self.loss(inputs, targets)
+            
+            self.optimizer.zero_grad()
+            loss /= self.args.sequence_length
+            loss.backward()     
+            losses.append(loss.item())           
+            self.optimizer.step()    
 
             if self.args.verbose and (i+1) % 100 == 0:
                 print("Iteration %2d: Loss = %.3f" % (i + 1, loss))
@@ -97,6 +100,9 @@ class Learner:
         alignments = []
         
         with torch.no_grad():
+            # set model to eval mode
+            self.encoder.eval()
+
             # when we're not doing a singular batch experiment, we select a different test batch
             if self.args.one_reward:
                 true_humans, query_seqs, answer_seqs = self.global_data
@@ -109,7 +115,6 @@ class Learner:
                 queries, answers = query_seqs[t, :, :].unsqueeze(0), answer_seqs[t, :, :].unsqueeze(0)
 
                 beliefs, hidden = self.encoder(queries, answers, hidden)
-                hidden = hidden.detach()
 
                 # compute predicted response at timestep for each sequence
                 inputs = response_dist(self.args, queries, beliefs)
@@ -166,6 +171,8 @@ class Learner:
             print("########### TRAINING ###########")
 
         losses = []
+        # set model to train mode
+        self.encoder.train()
 
         for n in range(self.args.num_iters):
             # get batch of starting queries for iteration
@@ -180,7 +187,6 @@ class Learner:
             for _ in range(self.args.encoder_spi):
                 
                 # initialize hidden and loss variables
-                self.optimizer.zero_grad()
                 hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
                 loss = 0
 
@@ -192,7 +198,6 @@ class Learner:
 
                     # get beliefs from queries and answers
                     beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
-                    hidden = hidden.detach()
 
                     # compute predicted response at timestep for each query
                     inputs = response_dist(self.args, curr_queries, beliefs)
@@ -201,21 +206,24 @@ class Learner:
                     inputs = inputs.view(-1, self.args.query_size)
                     targets = curr_answers.view(-1)
 
-                    # compute loss and back propagate
-                    loss = self.loss(inputs, targets)
-                    loss.backward()     
-                    losses.append(loss.item())    
-                    self.optimizer.step()   
+                    # compute loss and add to overall loss for sequence
+                    loss += self.loss(inputs, targets)
 
-                    # # get next queries
-                    # curr_queries = self.policy.run_policy(curr_queries, beliefs)
-                    # # get next answers (in the case of an actual human, would be replaced with labeling step)
-                    # answer_dist = response_dist(self.args, curr_queries, true_humans)
-                    # curr_answers = sample_dist(self.args, answer_dist)
+                    # get next queries
+                    curr_queries = self.policy.run_policy(curr_queries, beliefs)
+                    # get next answers (in the case of an actual human, would be replaced with labeling step)
+                    answer_dist = response_dist(self.args, curr_queries, true_humans)
+                    curr_answers = sample_dist(self.args, answer_dist)
 
-                    # # reshape to have sequence dim of 1
-                    # curr_queries = curr_queries.unsqueeze(0)
-                    # curr_answers = curr_answers.unsqueeze(0)             
+                    # reshape to have sequence dim of 1
+                    curr_queries = curr_queries.unsqueeze(0)
+                    curr_answers = curr_answers.unsqueeze(0)    
+
+                self.optimizer.zero_grad()
+                loss /= self.args.sequence_length
+                loss.backward()       
+                self.optimizer.step()   
+                losses.append(loss.item())    
 
             if self.args.verbose and (n+1) % 100 == 0:
                 print("Iteration %2d: Loss = %.3f" % (n+1, losses[-1]))
@@ -241,6 +249,9 @@ class Learner:
         alignments = []
         
         with torch.no_grad():
+            # set model to eval mode
+            self.encoder.eval()
+
             # when we're not doing a singular batch experiment, we select a different test batch
             # same reward used for testing and training
             if self.args.one_reward:
@@ -256,11 +267,10 @@ class Learner:
             curr_queries = queries.unsqueeze(0)
             curr_answers = answers.unsqueeze(0)
 
-            for _ in range(self.args.sequence_length):
+            for t in range(self.args.sequence_length):
 
                 # get beliefs from queries and answers
                 beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
-                hidden = hidden.detach()
 
                 # compute predicted response at timestep for each query
                 inputs = response_dist(self.args, curr_queries, beliefs)
@@ -278,16 +288,16 @@ class Learner:
                 mses.append(mse)
                 alignments.append(align)
 
-                # # get next queries
-                # curr_queries = self.policy.run_policy(curr_queries, beliefs)
-                # # get next answers (in the case of an actual human, would be replaced with labeling step)
-                # answer_dist = response_dist(self.args, curr_queries, true_humans)
-                # curr_answers = sample_dist(self.args, answer_dist)
+                # get next queries
+                curr_queries = self.policy.run_policy(curr_queries, beliefs)
+                # get next answers (in the case of an actual human, would be replaced with labeling step)
+                answer_dist = response_dist(self.args, curr_queries, true_humans)
+                curr_answers = sample_dist(self.args, answer_dist)
 
-                # # reshape to have sequence dim of 1
-                # curr_queries = curr_queries.unsqueeze(0)
-                # curr_answers = curr_answers.unsqueeze(0)   
-
+                # reshape to have sequence dim of 1
+                curr_queries = curr_queries.unsqueeze(0)
+                curr_answers = curr_answers.unsqueeze(0)
+                 
                 if self.args.verbose:
                     print("Query %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (t, loss, mse, align))
 

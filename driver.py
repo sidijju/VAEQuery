@@ -22,6 +22,7 @@ if env == 'gridworld':
 
     # collect dataset for the experiments
     dataset = collect_dataset(args, GridWorld(args))
+
 else:
     print('Invalid Environment Option')
 

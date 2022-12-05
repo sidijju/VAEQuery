@@ -90,4 +90,5 @@ def collect_dataset(args, world):
         if args.verbose and (i+1) % 200 == 0:
             print("Collected %2d queries" % (i+1))
     
+    dataset.normalize_dataset()
     return dataset

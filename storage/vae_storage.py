@@ -24,6 +24,11 @@ class VAEStorage:
 
         self.queries = torch.zeros((self.buffer_size, args.query_size * args.num_features))
 
+    def normalize_dataset(self):
+        mean = torch.mean(self.queries, dim=0)
+        std = torch.std(self.queries, dim=0)
+        self.queries = (self.queries - mean)/std
+
     def get_random_true_rewards(self, batchsize=5):
         true_rewards = torch.normal(0, 1, (batchsize, self.args.num_features))
         true_rewards = true_rewards / (torch.norm(true_rewards, 1).unsqueeze(-1))

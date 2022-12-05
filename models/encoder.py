@@ -16,12 +16,10 @@ class Encoder(nn.Module):
         self.hidden_dim = args.gru_hidden_size
 
         self.fc_input_query = nn.Linear(args.query_size * args.num_features, args.fc_dim)
-        self.fc_input_answer = nn.Linear(1, args.fc_dim)
-
-        self.fc_input = nn.Linear(2 * args.fc_dim, 4 * args.fc_dim)
+        self.fc_input = nn.Linear(args.fc_dim + 1, 2 * args.fc_dim)
 
         # RNN functionality
-        self.gru = nn.GRU(input_size=4 * args.fc_dim,
+        self.gru = nn.GRU(input_size=2 * args.fc_dim,
                           hidden_size=self.hidden_dim,
                           num_layers=args.gru_hidden_layers)
 
@@ -38,10 +36,14 @@ class Encoder(nn.Module):
 
     def reparameterize(self, mu, logvar):
         if self.args.sample_belief:
-            std = torch.exp(0.5*logvar).repeat(self.args.m, 1, 1)
+            # put batch dimension first
+            mu = mu.transpose(0, 1)
+            logvar = logvar.transpose(0, 1)
+            # shape is batch, 1, num_features
+            std = torch.exp(0.5*logvar).repeat(1, self.args.m, 1)
             eps = torch.randn_like(std)
-            belief = eps.mul(std).add_(mu.repeat(self.args.m, 1, 1))
-            belief = torch.mean(belief, dim=0)
+            belief = eps.mul(std).add_(mu.repeat(1, self.args.m, 1))
+            belief = torch.mean(belief, dim=-2)
             belief = belief / torch.linalg.norm(belief, dim=-1).unsqueeze(-1)
         else:
             belief = mu / torch.linalg.norm(mu, dim=-1).unsqueeze(-1)
@@ -49,14 +51,11 @@ class Encoder(nn.Module):
 
     def forward(self, query, answer, hidden):
         input_query = self.fc_input_query(query)
-        input_query = F.relu(input_query)
-
-        input_answer = self.fc_input_answer(answer.to(torch.float32))
-        input_answer = F.relu(input_answer)
+        input_query = F.leaky_relu(input_query)
         
-        input = torch.cat((input_query, input_answer), -1)
-        output = self.fc_input(input)
-        output = F.relu(output)
+        output = torch.cat((input_query, answer), -1)
+        output = self.fc_input(output)
+        output = F.leaky_relu(output)
 
         # run through gru
         output, hidden = self.gru(output, hidden)
@@ -64,7 +63,7 @@ class Encoder(nn.Module):
         # run through fc layers
         for l in self.fc_layers:
             output = l(output)
-            output = F.relu(output)
+            output = F.leaky_relu(output)
 
         # output belief distribution and belief sample
         mu = self.fc_mu(output)

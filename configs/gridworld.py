@@ -20,7 +20,7 @@ def args(rest_args):
                         help='set user to be optimal based on probability distributions')
     parser.set_defaults(optimal_user=False)
 
-    parser.add_argument('--temperature', type=float, default=.0005,
+    parser.add_argument('--temperature', type=float, default=1,
                         help='Boltzmann rationality temperature')
     parser.add_argument('--m', type=float, default=100,
                         help='how many samples for sampling from the belief distribution')
