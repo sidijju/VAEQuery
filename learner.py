@@ -272,10 +272,8 @@ class Learner:
                 # get beliefs from queries and answers
                 beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
 
-                # compute predicted response at timestep for each query
-                inputs = response_dist(self.args, curr_queries, beliefs)
-
                 # get inputs and targets for cross entropy loss
+                inputs = response_dist(self.args, curr_queries, beliefs)
                 inputs = inputs.view(-1, self.args.query_size)
                 targets = curr_answers.view(-1)
 

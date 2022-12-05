@@ -15,11 +15,11 @@ class Encoder(nn.Module):
         # TODO: add option to make multiple layers
         self.hidden_dim = args.gru_hidden_size
 
-        self.fc_input_query = nn.Linear(args.query_size * args.num_features, args.fc_dim)
-        self.fc_input = nn.Linear(args.fc_dim + 1, 2 * args.fc_dim)
+        self.fc_input_query = nn.Linear(args.num_features, args.fc_dim)
+        self.fc_input = nn.Linear(args.query_size * args.fc_dim + 1, 32)
 
         # RNN functionality
-        self.gru = nn.GRU(input_size=2 * args.fc_dim,
+        self.gru = nn.GRU(input_size=32,
                           hidden_size=self.hidden_dim,
                           num_layers=args.gru_hidden_layers)
 
@@ -50,8 +50,13 @@ class Encoder(nn.Module):
         return belief
 
     def forward(self, query, answer, hidden):
-        input_query = self.fc_input_query(query)
-        input_query = F.leaky_relu(input_query)
+        query = query.reshape((*query.shape[:-1], self.args.query_size, self.args.num_features))
+        query_embeddings = []
+        for i in range(self.args.query_size):
+            query_embeddings.append(self.fc_input_query(query[:, :, i, :]))
+        query_embeddings = torch.stack(query_embeddings, dim=-2)
+        query_embeddings = torch.flatten(query_embeddings, start_dim=-2)
+        input_query = F.leaky_relu(query_embeddings)
         
         output = torch.cat((input_query, answer), -1)
         output = self.fc_input(output)
