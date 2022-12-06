@@ -8,10 +8,10 @@ from query.simulate import *
 
 class Learner:
 
-    def __init__(self, args, dataset, policy):
+    def __init__(self, args, datasets, policy):
         self.args = args
-        self.dataset = dataset
-        self.policy = policy(args, dataset)
+        self.train_dataset, self.val_dataset, self.test_dataset = datasets
+        self.policy = policy(args)
         self.exp_name = args.exp_name
 
          # initialize encoder network
@@ -32,7 +32,7 @@ class Learner:
         # test if model can learn on only one true reward
         # same reward used for testing and training
         if self.args.one_reward:
-            true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=1, seqlength=self.args.sequence_length)
+            true_humans, query_seqs, answer_seqs = self.train_dataset.get_batch_seq(batchsize=1, seqlength=self.args.sequence_length)
             self.global_data = (true_humans, query_seqs, answer_seqs)
             self.args.batchsize = 1
         # TODO remove above later
@@ -52,7 +52,7 @@ class Learner:
                 # same reward used for testing and training
                 true_humans, query_seqs, answer_seqs = self.global_data
             else:
-                true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+                true_humans, query_seqs, answer_seqs = self.train_dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
 
             # initialize hidden and loss variables
             hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
@@ -107,7 +107,7 @@ class Learner:
             if self.args.one_reward:
                 true_humans, query_seqs, answer_seqs = self.global_data
             else:
-                true_humans, query_seqs, answer_seqs = self.dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+                true_humans, query_seqs, answer_seqs = self.train_dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
             
             hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
 
@@ -171,6 +171,7 @@ class Learner:
             print("########### TRAINING ###########")
 
         losses = []
+        val_losses = []
         # set model to train mode
         self.encoder.train()
 
@@ -180,21 +181,32 @@ class Learner:
             if self.args.one_reward:
                 true_humans, query_seqs, answer_seqs = self.global_data
                 queries, answers = query_seqs[0], answer_seqs[0]
+                val_queries, val_answers = query_seqs[-1], answer_seqs[-1]
+                val_humans = true_humans
             else:
-                true_humans, queries, answers = self.dataset.get_batch(batchsize=self.args.batchsize)
+                true_humans, queries, answers = self.train_dataset.get_batch(batchsize=self.args.batchsize)
+                val_humans, val_queries, val_answers = self.val_dataset.get_batch(batchsize=self.args.batchsize)
+                #val_humans = true_humans
 
             # train encoder
             for _ in range(self.args.encoder_spi):
                 
                 # initialize hidden and loss variables
                 hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
+                val_hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
                 loss = 0
+                val_loss = 0
 
                 # manually handle hidden inputs for gru for sequence
                 curr_queries = queries.unsqueeze(0)
                 curr_answers = answers.unsqueeze(0)
 
+                val_queries = val_queries.unsqueeze(0)
+                val_answers = val_answers.unsqueeze(0)
+
                 for _ in range(self.args.sequence_length):
+
+                    ### TRAINING BATCH ###
 
                     # get beliefs from queries and answers
                     beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
@@ -210,7 +222,7 @@ class Learner:
                     loss += self.loss(inputs, targets)
 
                     # get next queries
-                    curr_queries = self.policy.run_policy(curr_queries, beliefs)
+                    curr_queries = self.policy.run_policy(curr_queries, beliefs, self.train_dataset)
                     # get next answers (in the case of an actual human, would be replaced with labeling step)
                     answer_dist = response_dist(self.args, curr_queries, true_humans)
                     curr_answers = sample_dist(self.args, answer_dist)
@@ -219,30 +231,61 @@ class Learner:
                     curr_queries = curr_queries.unsqueeze(0)
                     curr_answers = curr_answers.unsqueeze(0)    
 
+                    ### VALIDATION BATCH ###
+
+                    # get beliefs from queries and answers
+                    val_beliefs, val_hidden = self.encoder(val_queries, val_answers, val_hidden)
+
+                    # compute predicted response at timestep for each query
+                    val_inputs = response_dist(self.args, val_queries, val_beliefs)
+
+                    # get inputs and targets for cross entropy loss
+                    val_inputs = val_inputs.view(-1, self.args.query_size)
+                    val_targets = val_answers.view(-1)
+
+                    # compute loss and add to overall loss for sequence
+                    val_loss += self.loss(val_inputs, val_targets)
+
+                    # get next queries
+                    val_queries = self.policy.run_policy(val_queries, val_beliefs, self.val_dataset)
+                    # get next answers (in the case of an actual human, would be replaced with labeling step)
+                    val_answer_dist = response_dist(self.args, val_queries, val_humans)
+                    val_answers = sample_dist(self.args, val_answer_dist)
+
+                    # reshape to have sequence dim of 1
+                    val_queries = val_queries.unsqueeze(0)
+                    val_answers = val_answers.unsqueeze(0)
+
                 self.optimizer.zero_grad()
                 loss /= self.args.sequence_length
+                val_loss /= self.args.sequence_length
                 loss.backward()       
-                self.optimizer.step()   
-                losses.append(loss.item())    
+                self.optimizer.step()  
+
+                losses.append(loss.item())  
+                val_losses.append(val_loss.item())  
 
             if self.args.verbose and (n+1) % 100 == 0:
-                print("Iteration %2d: Loss = %.3f" % (n+1, losses[-1]))
+                print("Iteration %2d: Loss = %.3f, Val Loss = %.3f" % (n+1, losses[-1], val_losses[-1]))
 
             # train policy
-            self.policy.train_policy(n=self.args.policy_spi)
+            self.policy.train_policy(self.train_dataset, n=self.args.policy_spi)
        
         # save plots for losses after training
         if self.args.visualize:
-            plt.plot(losses)
+            plt.plot(losses, label='train')
+            plt.plot(val_losses, label='validation')
+            plt.legend()
             plt.xlabel("Iterations")
             plt.ylabel("CE Error")
             plt.title("Query Distribution vs. Answer Error")
             plt.savefig(self.dir + "train-loss")
             plt.close()
-        
+
+    def test(self):
         # evaluate encoder on test batch
         if self.args.verbose:
-            print("######### TRAINING - EVALUATION #########")
+            print("######### TESTING #########")
             
         test_losses = []
         mses = []
@@ -258,7 +301,7 @@ class Learner:
                 true_humans, query_seqs, answer_seqs = self.global_data
                 queries, answers = query_seqs[0], answer_seqs[0]
             else:
-                true_humans, queries, answers = self.dataset.get_batch(batchsize=self.args.batchsize)
+                true_humans, queries, answers = self.test_dataset.get_batch(batchsize=self.args.batchsize)
 
             # initialize hidden and loss variables
             hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
@@ -287,7 +330,7 @@ class Learner:
                 alignments.append(align)
 
                 # get next queries
-                curr_queries = self.policy.run_policy(curr_queries, beliefs)
+                curr_queries = self.policy.run_policy(curr_queries, beliefs, self.test_dataset)
                 # get next answers (in the case of an actual human, would be replaced with labeling step)
                 answer_dist = response_dist(self.args, curr_queries, true_humans)
                 curr_answers = sample_dist(self.args, answer_dist)
@@ -295,7 +338,7 @@ class Learner:
                 # reshape to have sequence dim of 1
                 curr_queries = curr_queries.unsqueeze(0)
                 curr_answers = curr_answers.unsqueeze(0)
-                 
+                    
                 if self.args.verbose:
                     print("Query %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (t, loss, mse, align))
 

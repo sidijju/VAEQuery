@@ -22,6 +22,9 @@ if env == 'gridworld':
 
     # collect dataset for the experiments
     dataset = collect_dataset(args, GridWorld(args))
+    val_dataset = collect_dataset(args, GridWorld(args), mean=dataset.mean, std=dataset.std)
+    test_dataset = collect_dataset(args, GridWorld(args), mean=dataset.mean, std=dataset.std)
+    datasets = (dataset, val_dataset, test_dataset)
 
 else:
     print('Invalid Environment Option')
@@ -33,7 +36,7 @@ if args.visualize:
 
 #### set up learners for each policy ####
 
-rand_learner = Learner(args, dataset, RandomPolicy)
+rand_learner = Learner(args, datasets, RandomPolicy)
 #greedy_learner = Learner(args, dataset, GreedyPolicy) TODO
 #rl_learner = Learner(args, dataset, RLPolicy) TODO
 

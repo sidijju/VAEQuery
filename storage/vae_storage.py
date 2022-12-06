@@ -24,9 +24,16 @@ class VAEStorage:
 
         self.queries = torch.zeros((self.buffer_size, args.query_size * args.num_features))
 
-    def normalize_dataset(self):
-        mean = torch.mean(self.queries[:self.buffer_len], dim=0)
-        std = torch.std(self.queries[:self.buffer_len], dim=0)
+        self.mean = None
+        self.std = None
+
+    def normalize_dataset(self, mean=None, std=None):
+        if mean == None:
+            mean = torch.mean(self.queries[:self.buffer_len], dim=0)
+            self.mean = mean
+        if std == None:
+            std = torch.std(self.queries[:self.buffer_len], dim=0)
+            self.std = std
         for i in range(self.buffer_len):
             self.queries[i] = (self.queries[i] - mean) / std
 

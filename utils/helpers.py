@@ -66,7 +66,7 @@ def collect_random_trajectory(world):
 
     return obs, actions, next_obs, rews
 
-def collect_dataset(args, world):
+def collect_dataset(args, world, mean=None, std=None):
     feature_extractor = FeatureExtractor(args)
     dataset = VAEStorage(args)
 
@@ -90,5 +90,5 @@ def collect_dataset(args, world):
         if args.verbose and (i+1) % 200 == 0:
             print("Collected %2d queries" % (i+1))
     
-    dataset.normalize_dataset()
+    dataset.normalize_dataset(mean=mean, std=std)
     return dataset
