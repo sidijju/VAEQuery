@@ -2,7 +2,6 @@ from utils.helpers import makedir
 from models import encoder
 from torch import optim, nn
 import torch
-import numpy as np
 import matplotlib.pyplot as plt
 from query.simulate import *
 
@@ -186,7 +185,6 @@ class Learner:
             else:
                 true_humans, queries, answers = self.train_dataset.get_batch(batchsize=self.args.batchsize)
                 val_humans, val_queries, val_answers = self.val_dataset.get_batch(batchsize=self.args.batchsize)
-                #val_humans = true_humans
 
             # train encoder
             for _ in range(self.args.encoder_spi):
@@ -286,15 +284,16 @@ class Learner:
         # evaluate encoder on test batch
         if self.args.verbose:
             print("######### TESTING #########")
+
+        # set the encoder to eval mode
+        self.encoder.eval()
             
         test_losses = []
         mses = []
         alignments = []
         
         with torch.no_grad():
-            # set model to eval mode
-            self.encoder.eval()
-
+            
             # when we're not doing a singular batch experiment, we select a different test batch
             # same reward used for testing and training
             if self.args.one_reward:
@@ -312,13 +311,23 @@ class Learner:
 
             for t in range(self.args.sequence_length):
 
+                print()
+                print()
+
                 # get beliefs from queries and answers
                 beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
+
+                print("Beliefs", beliefs)
+                print("True Humans", true_humans)
 
                 # get inputs and targets for cross entropy loss
                 inputs = response_dist(self.args, curr_queries, beliefs)
                 inputs = inputs.view(-1, self.args.query_size)
                 targets = curr_answers.view(-1)
+
+                from torch.nn.functional import softmax
+                print("Dist", softmax(inputs, dim=-1))
+                print("Targets", targets)
 
                 # compute metrics and store in lists
                 loss = self.loss(inputs, targets)
@@ -353,19 +362,19 @@ class Learner:
             plt.xlabel("Queries")
             plt.ylabel("CE Loss")
             plt.title("Pretraining Evaluation - Loss")
-            plt.savefig(self.dir + "eval-loss")
+            plt.savefig(self.dir + "test-loss")
             plt.close()
 
             plt.plot(mses)
             plt.xlabel("Queries")
             plt.ylabel("MSE")
             plt.title("Pretraining Evaluation - Reward Error")
-            plt.savefig(self.dir + "eval-error")
+            plt.savefig(self.dir + "test-error")
             plt.close()
 
             plt.plot(alignments)
             plt.xlabel("Queries")
             plt.ylabel("Alignment")
             plt.title("Pretraining Evaluation - Reward Alignment")
-            plt.savefig(self.dir + "eval-alignment")
+            plt.savefig(self.dir + "test-alignment")
             plt.close()

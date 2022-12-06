@@ -16,7 +16,8 @@ exp_name = args.exp_name
 #### set up argument variables ####
 if env == 'gridworld':
     args = gridworld.args(rargs)
-    args.num_features = 6
+    #args.num_features = 6
+    args.num_features = 4
     args.env_type = env
     args.exp_name = exp_name
 
@@ -44,6 +45,9 @@ rand_learner = Learner(args, datasets, RandomPolicy)
 
 # run training for random policy
 rand_learner.train()
+
+# run testing for random policy
+rand_learner.test()
 
 # run training for greedy policy TODO
 # greedy_learner.train()

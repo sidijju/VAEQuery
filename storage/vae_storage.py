@@ -39,7 +39,7 @@ class VAEStorage:
 
     def get_random_true_rewards(self, batchsize=5):
         true_rewards = torch.normal(0, 1, (batchsize, self.args.num_features))
-        true_rewards = true_rewards / (torch.norm(true_rewards, 1).unsqueeze(-1))
+        true_rewards = true_rewards / (torch.norm(true_rewards, dim=-1).unsqueeze(-1))
         return true_rewards
 
     def get_random_queries(self, batchsize=5):
