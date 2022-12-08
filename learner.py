@@ -188,78 +188,76 @@ class Learner:
 
             # train encoder
             for _ in range(self.args.encoder_spi):
-                
-                # initialize hidden and loss variables
-                hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
-                val_hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
-                loss = 0
-                val_loss = 0
 
-                # manually handle hidden inputs for gru for sequence
-                curr_queries = queries.unsqueeze(0)
-                curr_answers = answers.unsqueeze(0)
+                # initialize storage for entire iteration
+                query_seqs = torch.zeros((self.args.sequence_length, *(queries.shape)))
+                answer_seqs = torch.zeros((self.args.sequence_length, *(answers.shape))).to(torch.long)
+                val_query_seqs = torch.zeros_like(query_seqs)
+                val_answer_seqs = torch.zeros_like(answer_seqs).to(torch.long)
 
-                val_queries = val_queries.unsqueeze(0)
-                val_answers = val_answers.unsqueeze(0)
+                # set first query in sequences to the batch
+                query_seqs[0] = queries
+                answer_seqs[0] = answers
+                val_query_seqs[0] = val_queries
+                val_answer_seqs[0] = val_answers
 
-                for _ in range(self.args.sequence_length):
+                for t in range(self.args.sequence_length):
 
-                    ### TRAINING BATCH ###
+                    # initialize loss for the iteration
+                    loss = 0
+                    val_loss = 0
 
-                    # get beliefs from queries and answers
-                    beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
+                    for i in range(t+1):
 
-                    # compute predicted response at timestep for each query
-                    inputs = response_dist(self.args, curr_queries, beliefs)
+                        # manually handle hidden inputs for gru for sequence
+                        curr_queries = query_seqs[i].unsqueeze(0)
+                        curr_answers = answer_seqs[i].unsqueeze(0)
+                        val_queries = val_query_seqs[i].unsqueeze(0)
+                        val_answers = val_answer_seqs[i].unsqueeze(0)
 
-                    # get inputs and targets for cross entropy loss
-                    inputs = inputs.view(-1, self.args.query_size)
-                    targets = curr_answers.view(-1)
+                        # initialize hidden variables
+                        hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
+                        val_hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
+                    
+                        # get beliefs from queries and answers
+                        beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
+                        val_beliefs, val_hidden = self.encoder(val_queries, val_answers, val_hidden)
 
-                    # compute loss and add to overall loss for sequence
-                    loss += self.loss(inputs, targets)
+                        # compute predicted response at timestep for each query
+                        inputs = response_dist(self.args, curr_queries, beliefs)
+                        val_inputs = response_dist(self.args, val_queries, val_beliefs)
 
-                    # get next queries
-                    curr_queries = self.policy.run_policy(curr_queries, beliefs, self.train_dataset)
-                    # get next answers (in the case of an actual human, would be replaced with labeling step)
-                    answer_dist = response_dist(self.args, curr_queries, true_humans)
-                    curr_answers = sample_dist(self.args, answer_dist)
+                        # get inputs and targets for cross entropy loss
+                        inputs = inputs.view(-1, self.args.query_size)
+                        val_inputs = val_inputs.view(-1, self.args.query_size)
+                        targets = curr_answers.view(-1)
+                        val_targets = val_answers.view(-1)
 
-                    # reshape to have sequence dim of 1
-                    curr_queries = curr_queries.unsqueeze(0)
-                    curr_answers = curr_answers.unsqueeze(0)    
+                        # compute loss so far
+                        loss += self.loss(inputs, targets)
+                        val_loss += self.loss(val_inputs, val_targets)
 
-                    ### VALIDATION BATCH ###
+                    # optimize over the current sequence
+                    self.optimizer.zero_grad()
+                    loss.backward()       
+                    self.optimizer.step()  
 
-                    # get beliefs from queries and answers
-                    val_beliefs, val_hidden = self.encoder(val_queries, val_answers, val_hidden)
+                    if t+1 < self.args.sequence_length:
+                        # get next queries
+                        next_queries = self.policy.run_policy(query_seqs[t], beliefs, self.train_dataset)
+                        next_val_queries = self.policy.run_policy(val_query_seqs[t], val_beliefs, self.val_dataset)
 
-                    # compute predicted response at timestep for each query
-                    val_inputs = response_dist(self.args, val_queries, val_beliefs)
+                        # get next answers (in the case of an actual human, would be replaced with labeling step)
+                        next_answers = sample_dist(self.args, response_dist(self.args, curr_queries, true_humans))
+                        next_val_answers = sample_dist(self.args, response_dist(self.args, val_queries, val_humans))
 
-                    # get inputs and targets for cross entropy loss
-                    val_inputs = val_inputs.view(-1, self.args.query_size)
-                    val_targets = val_answers.view(-1)
+                        # add next queries to sequence
+                        query_seqs[t+1] = next_queries
+                        answer_seqs[t+1] = next_answers    
+                        val_query_seqs[t+1] = next_val_queries
+                        val_answer_seqs[t+1] = next_val_answers
 
-                    # compute loss and add to overall loss for sequence
-                    val_loss += self.loss(val_inputs, val_targets)
-
-                    # get next queries
-                    val_queries = self.policy.run_policy(val_queries, val_beliefs, self.val_dataset)
-                    # get next answers (in the case of an actual human, would be replaced with labeling step)
-                    val_answer_dist = response_dist(self.args, val_queries, val_humans)
-                    val_answers = sample_dist(self.args, val_answer_dist)
-
-                    # reshape to have sequence dim of 1
-                    val_queries = val_queries.unsqueeze(0)
-                    val_answers = val_answers.unsqueeze(0)
-
-                self.optimizer.zero_grad()
-                loss /= self.args.sequence_length
-                val_loss /= self.args.sequence_length
-                loss.backward()       
-                self.optimizer.step()  
-
+                # store losses
                 losses.append(loss.item())  
                 val_losses.append(val_loss.item())  
 
