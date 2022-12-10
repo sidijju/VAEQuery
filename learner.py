@@ -244,7 +244,7 @@ class Learner:
                     loss /= (t+1)
                     val_loss /= (t+1)
                     ##################################
-                    
+
                     loss.backward()       
                     self.optimizer.step()  
 
@@ -315,30 +315,18 @@ class Learner:
 
             for t in range(self.args.sequence_length):
 
-                print()
-                print()
-
                 # get beliefs from queries and answers
                 beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
-
-                print("Beliefs", beliefs)
-                print(torch.norm(beliefs, dim=-1))
-                print("True Humans", true_humans)
 
                 # get inputs and targets for cross entropy loss
                 inputs = response_dist(self.args, curr_queries, beliefs)
                 inputs = inputs.view(-1, self.args.query_size)
                 targets = curr_answers.view(-1)
 
-                from torch.nn.functional import softmax
-                print("Dist", softmax(inputs, dim=-1))
-                print("Targets", targets)
-
                 # compute metrics and store in lists
                 loss = self.loss(inputs, targets)
                 mse = self.mse(beliefs, true_humans)
-                print(alignment(beliefs, true_humans))
-                align = alignment(beliefs, true_humans).mean()
+                align = alignment(beliefs, true_humans)
 
                 test_losses.append(loss.item())
                 mses.append(mse)

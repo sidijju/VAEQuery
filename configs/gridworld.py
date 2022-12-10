@@ -6,7 +6,7 @@ def args(rest_args):
 
     ##### GENERAL #####
 
-    parser.add_argument('--num_iters', type=int, default=1000)
+    parser.add_argument('--num_iters', type=int, default=100)
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--log_dir', type=Path, default=Path('/logs'))
     parser.add_argument('--save_interval', type=int, default=10)
@@ -42,7 +42,7 @@ def args(rest_args):
     parser.add_argument('--pretrain_iters', type=int, default=1000,
                         help='how many iterations to pretrain the vae')
     parser.add_argument('--lr', type=float, default=.01)
-    parser.add_argument('--batchsize', type=int, default=10,
+    parser.add_argument('--batchsize', type=int, default=500,
                         help='how many queries to use for VAE update')
     parser.add_argument('--sequence_length', type=int, default=20,
                         help='how long a query sequence is for RNN')

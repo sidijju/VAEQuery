@@ -20,4 +20,4 @@ def response_dist(args, query, w):
     return dist
 
 def alignment(w1, w2):
-    return abs(torch.sum(w1 * w2, dim=-1)/(torch.linalg.norm(w1, dim=-1)*torch.linalg.norm(w2, dim=-1)))
+    return abs(torch.sum(w1 * w2, dim=-1)/(torch.linalg.norm(w1, dim=-1)*torch.linalg.norm(w2, dim=-1))).mean()
