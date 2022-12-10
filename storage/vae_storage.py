@@ -28,14 +28,18 @@ class VAEStorage:
         self.std = None
 
     def normalize_dataset(self, mean=None, std=None):
+        queries = self.queries.reshape((-1, self.args.num_features))
         if mean == None:
-            mean = torch.mean(self.queries[:self.buffer_len], dim=0)
+            mean = torch.mean(queries[:self.buffer_len], dim=0)
             self.mean = mean
         if std == None:
-            std = torch.std(self.queries[:self.buffer_len], dim=0)
+            std = torch.std(queries[:self.buffer_len], dim=0)
             self.std = std
+
         for i in range(self.buffer_len):
-            self.queries[i] = (self.queries[i] - mean) / std
+            queries[i] = (queries[i] - mean) / std
+
+        self.queries = queries.reshape((self.buffer_size, self.args.query_size * self.args.num_features))
 
     def get_random_true_rewards(self, batchsize=5):
         true_rewards = torch.normal(0, 1, (batchsize, self.args.num_features))
@@ -95,7 +99,7 @@ class VAEStorage:
             self.buffer_len = self.buffer_size
             self.idx = 0
         else:
-            self.buffer_len += 1
+            self.buffer_len = min(self.buffer_len + 1, self.buffer_size)
 
         # add to larger buffer
         self.queries[self.idx] = query

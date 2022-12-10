@@ -20,7 +20,6 @@ class FeatureExtractor:
 
     def __init__(self, args):
         self.args = args
-        pass
 
     def featurize(self, traj):
         features = np.zeros((self.args.num_features))

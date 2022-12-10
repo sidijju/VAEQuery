@@ -22,7 +22,7 @@ def args(rest_args):
 
     parser.add_argument('--temperature', type=float, default=1,
                         help='Boltzmann rationality temperature')
-    parser.add_argument('--m', type=float, default=100,
+    parser.add_argument('--m', type=int, default=100,
                         help='how many samples for sampling from the belief distribution')
    
     ##### POLICY #####

@@ -43,8 +43,8 @@ class Encoder(nn.Module):
             std = torch.exp(0.5*logvar).repeat(1, self.args.m, 1)
             eps = torch.randn_like(std)
             belief = eps.mul(std).add_(mu.repeat(1, self.args.m, 1))
-            belief = torch.mean(belief, dim=-2)
             belief = belief / torch.linalg.norm(belief, dim=-1).unsqueeze(-1)
+            belief = torch.mean(belief, dim=-2)
         else:
             belief = mu / torch.linalg.norm(mu, dim=-1).unsqueeze(-1)
         return belief
