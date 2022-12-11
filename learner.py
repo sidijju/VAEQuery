@@ -21,7 +21,7 @@ class Learner:
 
         # define loss functions for VAE
         self.loss = nn.CrossEntropyLoss()
-        self.mse = nn.MSELoss()
+        self.mse = nn.MSELoss(reduction='none')
 
         # directory for plots
         if self.args.visualize:
@@ -207,6 +207,10 @@ class Learner:
                     loss = 0
                     val_loss = 0
 
+                    # initialize hidden variables
+                    hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
+                    val_hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
+
                     for i in range(t+1):
 
                         # manually handle hidden inputs for gru for sequence
@@ -214,10 +218,6 @@ class Learner:
                         curr_answers = answer_seqs[i].unsqueeze(0)
                         val_queries = val_query_seqs[i].unsqueeze(0)
                         val_answers = val_answer_seqs[i].unsqueeze(0)
-
-                        # initialize hidden variables
-                        hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
-                        val_hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
                     
                         # get beliefs from queries and answers
                         beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
@@ -241,8 +241,8 @@ class Learner:
                     self.optimizer.zero_grad()
 
                     ## NOT SURE IF I SHOULD DO THIS ##
-                    loss /= (t+1)
-                    val_loss /= (t+1)
+                    #loss /= (t+1)
+                    #val_loss /= (t+1)
                     ##################################
 
                     loss.backward()       
@@ -293,8 +293,10 @@ class Learner:
         self.encoder.eval()
             
         test_losses = []
-        mses = []
-        alignments = []
+        mses_mean = []
+        mses_std = []
+        alignments_mean = []
+        alignments_std = []
         
         with torch.no_grad():
             
@@ -325,12 +327,14 @@ class Learner:
 
                 # compute metrics and store in lists
                 loss = self.loss(inputs, targets)
-                mse = self.mse(beliefs, true_humans)
+                mses = self.mse(beliefs, true_humans)
                 align = alignment(beliefs, true_humans)
 
                 test_losses.append(loss.item())
-                mses.append(mse)
-                alignments.append(align)
+                mses_mean.append(mses.mean())
+                mses_std.append(mses.std())
+                alignments_mean.append(align.mean())
+                alignments_std.append(align.std())
 
                 # get next queries
                 curr_queries = self.policy.run_policy(curr_queries, beliefs, self.test_dataset)
@@ -343,7 +347,7 @@ class Learner:
                 curr_answers = curr_answers.unsqueeze(0)
                     
                 if self.args.verbose:
-                    print("Query %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (t, loss, mse, align))
+                    print("Query %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (t, loss, mses_mean[-1], alignments_mean[-1]))
 
             if self.args.one_reward:
                 print("Reward Comparison")
@@ -359,14 +363,14 @@ class Learner:
             plt.savefig(self.dir + "test-loss")
             plt.close()
 
-            plt.plot(mses)
+            plt.errorbar(range(len(mses_mean)), mses_mean, yerr=mses_std)
             plt.xlabel("Queries")
             plt.ylabel("MSE")
             plt.title("Pretraining Evaluation - Reward Error")
             plt.savefig(self.dir + "test-error")
             plt.close()
 
-            plt.plot(alignments)
+            plt.errorbar(range(len(alignments_mean)), alignments_mean, yerr=alignments_std)
             plt.xlabel("Queries")
             plt.ylabel("Alignment")
             plt.title("Pretraining Evaluation - Reward Alignment")
