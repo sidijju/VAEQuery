@@ -4,6 +4,7 @@ from torch import optim, nn
 import torch
 import matplotlib.pyplot as plt
 from query.simulate import *
+from tqdm import trange
 
 class Learner:
 
@@ -174,7 +175,7 @@ class Learner:
         # set model to train mode
         self.encoder.train()
 
-        for n in range(self.args.num_iters):
+        for n in trange(self.args.num_iters):
             # get batch of starting queries for iteration
             # same reward used for testing and training
             if self.args.one_reward:
@@ -202,43 +203,36 @@ class Learner:
                 val_answer_seqs[0] = val_answers
 
                 for t in range(self.args.sequence_length):
-
-                    # initialize loss for the iteration
-                    loss = 0
-                    val_loss = 0
-
                     # initialize hidden variables
                     hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
                     val_hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
 
-                    for i in range(t+1):
-
-                        # manually handle hidden inputs for gru for sequence
-                        curr_queries = query_seqs[i].unsqueeze(0)
-                        curr_answers = answer_seqs[i].unsqueeze(0)
-                        val_queries = val_query_seqs[i].unsqueeze(0)
-                        val_answers = val_answer_seqs[i].unsqueeze(0)
+                    # manually handle hidden inputs for gru for sequence
+                    query_seq = query_seqs[:(t+1)]
+                    answer_seq = answer_seqs[:(t+1)]
+                    val_query_seq = val_query_seqs[:(t+1)]
+                    val_answer_seq = val_answer_seqs[:(t+1)]
                     
-                        # get beliefs from queries and answers
-                        beliefs, hidden = self.encoder(curr_queries, hidden)
-                        val_beliefs, val_hidden = self.encoder(val_queries, val_hidden)
+                    # get beliefs from queries and answers
+                    beliefs, hidden = self.encoder(query_seq, hidden)
+                    val_beliefs, val_hidden = self.encoder(val_query_seq, val_hidden)
 
-                        # compute predicted response at timestep for each query
-                        inputs = response_dist(self.args, curr_queries, beliefs)
-                        val_inputs = response_dist(self.args, val_queries, val_beliefs)
+                    # compute predicted response at timestep for each query
+                    inputs = response_dist(self.args, query_seq, beliefs)
+                    val_inputs = response_dist(self.args, val_query_seq, val_beliefs)
 
-                        # get inputs and targets for cross entropy loss
-                        inputs = inputs.view(-1, self.args.query_size)
-                        val_inputs = val_inputs.view(-1, self.args.query_size)
-                        targets = curr_answers.view(-1)
-                        val_targets = val_answers.view(-1)
-
-                        # compute loss so far
-                        loss += self.loss(inputs, targets)
-                        val_loss += self.loss(val_inputs, val_targets)
+                    # get inputs and targets for cross entropy loss
+                    inputs = inputs.view(-1, self.args.query_size)
+                    val_inputs = val_inputs.view(-1, self.args.query_size)
+                    targets = answer_seq.view(-1)
+                    val_targets = val_answer_seq.view(-1)
 
                     # optimize over the current sequence
                     self.optimizer.zero_grad()
+
+                    # compute loss
+                    loss = self.loss(inputs, targets)
+                    val_loss = self.loss(val_inputs, val_targets)
 
                     ## NOT SURE IF I SHOULD DO THIS ##
                     # loss /= (t+1)
@@ -254,8 +248,8 @@ class Learner:
                         next_val_queries = self.policy.run_policy(val_query_seqs[t], val_beliefs, self.val_dataset)
 
                         # get next answers (in the case of an actual human, would be replaced with labeling step)
-                        next_answers = sample_dist(self.args, response_dist(self.args, curr_queries, true_humans))
-                        next_val_answers = sample_dist(self.args, response_dist(self.args, val_queries, val_humans))
+                        next_answers = sample_dist(self.args, response_dist(self.args, next_queries, true_humans))
+                        next_val_answers = sample_dist(self.args, response_dist(self.args, next_val_queries, val_humans))
 
                         # add next queries to sequence
                         query_seqs[t+1] = next_queries
@@ -366,7 +360,7 @@ class Learner:
             if self.args.one_reward or self.args.batchsize <= 1:
                 plt.plot(range(len(mses_mean)), mses_mean)
             else:
-                plt.errorbar(range(len(mses_mean)), mses_mean, yerr=mses_std)
+                plt.errorbar(range(len(mses_mean)), mses_mean, yerr=mses_std/(np.sqrt(len(mses_std))))
             plt.xlabel("Queries")
             plt.ylabel("MSE")
             plt.title("Test Evaluation - Reward Error")
@@ -376,7 +370,7 @@ class Learner:
             if self.args.one_reward or self.args.batchsize <= 1:
                 plt.errorbar(range(len(alignments_mean)), alignments_mean)
             else:
-                plt.errorbar(range(len(alignments_mean)), alignments_mean, yerr=alignments_std)
+                plt.errorbar(range(len(alignments_mean)), alignments_mean, yerr=alignments_std/(np.sqrt(len(alignments_std))))
             plt.xlabel("Queries")
             plt.ylabel("Alignment")
             plt.title("Test Evaluation - Reward Alignment")

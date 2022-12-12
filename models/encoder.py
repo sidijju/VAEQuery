@@ -16,10 +16,10 @@ class Encoder(nn.Module):
         self.hidden_dim = args.gru_hidden_size
 
         self.fc_input_query = nn.Linear(args.num_features, args.fc_dim)
-        self.fc_input = nn.Linear(args.query_size * args.fc_dim, 32)
+        self.fc_input = nn.Linear(args.query_size * args.fc_dim, 64)
 
         # RNN functionality
-        self.gru = nn.GRU(input_size=32,
+        self.gru = nn.GRU(input_size=64,
                           hidden_size=self.hidden_dim,
                           num_layers=args.gru_hidden_layers)
 
