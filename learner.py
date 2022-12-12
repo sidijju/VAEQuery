@@ -241,8 +241,8 @@ class Learner:
                     self.optimizer.zero_grad()
 
                     ## NOT SURE IF I SHOULD DO THIS ##
-                    #loss /= (t+1)
-                    #val_loss /= (t+1)
+                    loss /= (t+1)
+                    val_loss /= (t+1)
                     ##################################
 
                     loss.backward()       
