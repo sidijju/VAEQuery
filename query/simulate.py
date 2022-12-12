@@ -11,7 +11,7 @@ def sample_dist(args, dist):
     return sample
 
 def response_dist(args, query, w):
-    trajs = torch.reshape(query, (*query.shape[:-1], args.query_size, args.num_features))
+    trajs = torch.reshape(query, (-1, args.query_size, args.num_features))
     w = w.unsqueeze(-2)
     dist = torch.sum(trajs * w, dim=-1)
     # boltzmann rationality

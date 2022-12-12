@@ -16,7 +16,7 @@ class Encoder(nn.Module):
         self.hidden_dim = args.gru_hidden_size
 
         self.fc_input_query = nn.Linear(args.num_features, args.fc_dim)
-        self.fc_input = nn.Linear(args.query_size * args.fc_dim + 1, 32)
+        self.fc_input = nn.Linear(args.query_size * args.fc_dim, 32)
 
         # RNN functionality
         self.gru = nn.GRU(input_size=32,
@@ -49,8 +49,7 @@ class Encoder(nn.Module):
             belief = mu / torch.linalg.norm(mu, dim=-1).unsqueeze(-1)
         return belief
 
-    def forward(self, query, answer, hidden):
-        query = query.reshape((*query.shape[:-1], self.args.query_size, self.args.num_features))
+    def forward(self, query, hidden):
         query_embeddings = []
         for i in range(self.args.query_size):
             query_embeddings.append(self.fc_input_query(query[:, :, i, :]))
@@ -58,8 +57,7 @@ class Encoder(nn.Module):
         query_embeddings = torch.flatten(query_embeddings, start_dim=-2)
         input_query = F.leaky_relu(query_embeddings)
         
-        output = torch.cat((input_query, answer), -1)
-        output = self.fc_input(output)
+        output = self.fc_input(input_query)
         output = F.leaky_relu(output)
 
         # run through gru
@@ -78,5 +76,5 @@ class Encoder(nn.Module):
         return belief, hidden
 
     def init_hidden(self, batchsize):
-        hidden = torch.zeros((1, batchsize, self.hidden_dim))
+        hidden = torch.zeros((self.args.gru_hidden_layers, batchsize, self.hidden_dim))
         return hidden

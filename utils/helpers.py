@@ -22,7 +22,7 @@ class FeatureExtractor:
         self.args = args
 
     def featurize(self, traj):
-        features = np.zeros((self.args.num_features))
+        features = torch.zeros((self.args.num_features))
         obs, actions, next_obs, rews = traj
         
         if self.args.env_type == 'gridworld':
@@ -93,11 +93,9 @@ def collect_dataset(args, world, mean=None, std=None):
         for _ in range(args.query_size):
             traj = collect_random_trajectory(world)
             featurized = feature_extractor.featurize(traj)
-            query.extend(featurized)
+            query.append(featurized)
         
-        assert len(query) == args.query_size * args.num_features
-        
-        query = torch.tensor(query)
+        query = torch.stack(query)
         dataset.insert(query)
 
         if args.verbose and (i+1) % 200 == 0:

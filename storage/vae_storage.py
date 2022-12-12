@@ -22,24 +22,21 @@ class VAEStorage:
         self.buffer_len = 0
         self.idx = 0
 
-        self.queries = torch.zeros((self.buffer_size, args.query_size * args.num_features))
+        self.queries = torch.zeros((self.buffer_size, args.query_size, args.num_features))
 
         self.mean = None
         self.std = None
 
     def normalize_dataset(self, mean=None, std=None):
-        queries = self.queries.reshape((-1, self.args.num_features))
         if mean == None:
-            mean = torch.mean(queries[:self.buffer_len], dim=0)
+            mean = torch.mean(self.queries[:self.buffer_len], dim=0)
             self.mean = mean
         if std == None:
-            std = torch.std(queries[:self.buffer_len], dim=0)
+            std = torch.std(self.queries[:self.buffer_len], dim=0)
             self.std = std
 
         for i in range(self.buffer_len):
-            queries[i] = (queries[i] - mean) / std
-
-        self.queries = queries.reshape((self.buffer_size, self.args.query_size * self.args.num_features))
+            self.queries[i] = (self.queries[i] - mean) / std
 
     def get_random_true_rewards(self, batchsize=5):
         true_rewards = torch.normal(0, 1, (batchsize, self.args.num_features))
@@ -50,47 +47,47 @@ class VAEStorage:
          # select random indices for queries
         size = min(self.buffer_len, batchsize)
         idx = np.random.choice(range(self.buffer_len), size, replace=False)
-        queries = self.queries[idx, :]
+        queries = self.queries[idx, :, :]
         return queries
    
-    def get_batch(self, batchsize=5):
+    def get_batch(self, batchsize=5, true_rewards=None):
         # get batchsize queries and responses from dataset
         queries = self.get_random_queries(batchsize=batchsize)
 
-        # get true rewards
-        true_rewards = self.get_random_true_rewards(batchsize=batchsize)
+        # get true rewards if None
+        if true_rewards is None:
+            true_rewards = self.get_random_true_rewards(batchsize=batchsize)
 
         dists = response_dist(self.args, queries, true_rewards)
         answers = []
         for b in range(batchsize):
             answers.append(sample_dist(self.args, dists[b]))
+            # shuffle queries so that the chosen query is first
+            idx = list(range(self.args.query_size))
+            idx.insert(0, idx.pop(answers[b]))
+            queries[b] = queries[b][idx]
         answers = torch.stack(answers)
-        
+
         # select the rollouts we want
         return true_rewards, queries, answers
 
     def get_batch_seq(self, batchsize=5, seqlength=10):
-        # generate query sequences
-        query_seqs = []
-        for _ in range(seqlength):
-            # select the rollouts we want and append to sequences
-            queries = self.get_random_queries(batchsize=batchsize)
-            query_seqs.append(queries)
-        query_seqs = torch.stack(query_seqs)
-
         # get true rewards for each query sequence
         true_rewards = self.get_random_true_rewards(batchsize=batchsize)
 
-        # generate answer sequences
-        # detach rewards to prevent gradients
-        dists = response_dist(self.args, query_seqs, true_rewards)
+        # generate query and answer sequences
+        query_seqs = []
         answer_seqs = []
-        for t in range(seqlength):
-            answer_seq = sample_dist(self.args, dists[t])
-            answer_seqs.append(answer_seq)
+        for _ in range(seqlength):
+            # select the rollouts we want and append to sequences
+            _, queries, answers = self.get_batch(batchsize=batchsize, true_rewards=true_rewards)
+            query_seqs.append(queries)
+            answer_seqs.append(answers)
+
+        query_seqs = torch.stack(query_seqs)   
         answer_seqs = torch.stack(answer_seqs)
 
-        return true_rewards, query_seqs, answer_seqs
+        return true_rewards, query_seqs, 
 
     def insert(self, query):
 

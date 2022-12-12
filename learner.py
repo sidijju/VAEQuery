@@ -220,8 +220,8 @@ class Learner:
                         val_answers = val_answer_seqs[i].unsqueeze(0)
                     
                         # get beliefs from queries and answers
-                        beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
-                        val_beliefs, val_hidden = self.encoder(val_queries, val_answers, val_hidden)
+                        beliefs, hidden = self.encoder(curr_queries, hidden)
+                        val_beliefs, val_hidden = self.encoder(val_queries, val_hidden)
 
                         # compute predicted response at timestep for each query
                         inputs = response_dist(self.args, curr_queries, beliefs)
@@ -318,7 +318,7 @@ class Learner:
             for t in range(self.args.sequence_length):
 
                 # get beliefs from queries and answers
-                beliefs, hidden = self.encoder(curr_queries, curr_answers, hidden)
+                beliefs, hidden = self.encoder(curr_queries, hidden)
 
                 # get inputs and targets for cross entropy loss
                 inputs = response_dist(self.args, curr_queries, beliefs)
