@@ -52,7 +52,7 @@ def args(rest_args):
                         help='number of hidden layers')
     parser.add_argument('--gru_hidden_size', type=int, default=64, 
                         help='size of hidden layers')
-    parser.add_argument('--fc_layers', type=list, default=[16, 32, 64], 
+    parser.add_argument('--fc_layers', type=list, default=[32], 
                         help='fc layers for VAE')
     parser.add_argument('--use_mu', dest='sample_belief', action='store_false')
     parser.set_defaults(sample_belief=True)

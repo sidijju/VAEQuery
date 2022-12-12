@@ -235,8 +235,8 @@ class Learner:
                     val_loss = self.loss(val_inputs, val_targets)
 
                     ## NOT SURE IF I SHOULD DO THIS ##
-                    # loss /= (t+1)
-                    # val_loss /= (t+1)
+                    loss *= (t+1)
+                    val_loss *= (t+1)
                     ##################################
 
                     loss.backward()       
