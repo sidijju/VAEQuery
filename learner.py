@@ -241,8 +241,8 @@ class Learner:
                     self.optimizer.zero_grad()
 
                     ## NOT SURE IF I SHOULD DO THIS ##
-                    loss /= (t+1)
-                    val_loss /= (t+1)
+                    # loss /= (t+1)
+                    # val_loss /= (t+1)
                     ##################################
 
                     loss.backward()       
@@ -359,20 +359,26 @@ class Learner:
             plt.plot(test_losses)
             plt.xlabel("Queries")
             plt.ylabel("CE Loss")
-            plt.title("Pretraining Evaluation - Loss")
+            plt.title("Test Evaluation - Loss")
             plt.savefig(self.dir + "test-loss")
             plt.close()
 
-            plt.errorbar(range(len(mses_mean)), mses_mean, yerr=mses_std)
+            if self.args.one_reward or self.args.batchsize <= 1:
+                plt.plot(range(len(mses_mean)), mses_mean)
+            else:
+                plt.errorbar(range(len(mses_mean)), mses_mean, yerr=mses_std)
             plt.xlabel("Queries")
             plt.ylabel("MSE")
-            plt.title("Pretraining Evaluation - Reward Error")
+            plt.title("Test Evaluation - Reward Error")
             plt.savefig(self.dir + "test-error")
             plt.close()
 
-            plt.errorbar(range(len(alignments_mean)), alignments_mean, yerr=alignments_std)
+            if self.args.one_reward or self.args.batchsize <= 1:
+                plt.errorbar(range(len(alignments_mean)), alignments_mean)
+            else:
+                plt.errorbar(range(len(alignments_mean)), alignments_mean, yerr=alignments_std)
             plt.xlabel("Queries")
             plt.ylabel("Alignment")
-            plt.title("Pretraining Evaluation - Reward Alignment")
+            plt.title("Test Evaluation - Reward Alignment")
             plt.savefig(self.dir + "test-alignment")
             plt.close()

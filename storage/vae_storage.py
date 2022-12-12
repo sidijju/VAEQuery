@@ -87,7 +87,7 @@ class VAEStorage:
         query_seqs = torch.stack(query_seqs)   
         answer_seqs = torch.stack(answer_seqs)
 
-        return true_rewards, query_seqs, 
+        return true_rewards, query_seqs, answer_seqs
 
     def insert(self, query):
 

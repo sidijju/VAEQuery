@@ -50,14 +50,12 @@ class Encoder(nn.Module):
         return belief
 
     def forward(self, query, hidden):
-        query_embeddings = []
-        for i in range(self.args.query_size):
-            query_embeddings.append(self.fc_input_query(query[:, :, i, :]))
-        query_embeddings = torch.stack(query_embeddings, dim=-2)
-        query_embeddings = torch.flatten(query_embeddings, start_dim=-2)
-        input_query = F.leaky_relu(query_embeddings)
-        
-        output = self.fc_input(input_query)
+        # embed query inputs
+        embeddings = self.fc_input_query(query)
+        embeddings = torch.flatten(embeddings, start_dim=-2)
+
+        # fc layer
+        output = self.fc_input(embeddings)
         output = F.leaky_relu(output)
 
         # run through gru
