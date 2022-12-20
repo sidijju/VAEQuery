@@ -46,17 +46,17 @@ class FeatureExtractor:
 
             ### ONLY FOUR FEATURES ###
 
-            #feature 0 - average distance from bottom left
-            features[0] = sum([distance(ob[0], 0, ob[1], 0) for ob in next_obs])/len(obs)
+            #feature 0 - total reward
+            features[0] = rews.sum()
 
-            #feature 1 - average distance from top right
-            features[1] = sum([distance(ob[0], self.args.grid_size, ob[1], self.args.grid_size) for ob in next_obs])/len(obs)
+            #feature 1 - number of actions that aren't stay
+            features[1] = len(actions) - np.count_nonzero(actions == 4)
 
-            #feature 2 - average distance from bottom right
-            features[2] = sum([distance(ob[0], self.args.grid_size, ob[1], 0) for ob in next_obs])/len(obs)
+            #feature 2 - average x distance
+            features[2] = sum([distance(ob[0], 0, 0, 0) for ob in next_obs])/len(obs)
 
-            #feature 3 - average distance from top left
-            features[3] = sum([distance(ob[0], 0, ob[1], self.args.grid_size) for ob in next_obs])/len(obs)
+            #feature 3 - average y distance
+            features[3] = sum([distance(0, 0, ob[1], 0) for ob in next_obs])/len(obs)
 
         return features
 

@@ -179,19 +179,18 @@ class Learner:
         val_losses = []
         # set model to train mode
         self.encoder.train()
-        torch.autograd.set_detect_anomaly(True)
 
         for n in trange(self.args.num_iters):
             # get batch of starting queries for iteration
             # same reward used for testing and training
             if self.args.one_reward:
                 true_humans, query_seqs, answer_seqs = self.global_data
-                queries, answers = query_seqs[0], answer_seqs[0]
-                val_queries, val_answers = query_seqs[-1], answer_seqs[-1]
+                queries, _ = query_seqs[0], answer_seqs[0]
+                val_queries, _ = query_seqs[-1], answer_seqs[-1]
                 val_humans = true_humans
             else:
-                true_humans, queries, answers = self.train_dataset.get_batch(batchsize=self.batchsize)
-                val_humans, val_queries, val_answers = self.val_dataset.get_batch(batchsize=self.batchsize)
+                true_humans, queries, _ = self.train_dataset.get_batch(batchsize=self.batchsize)
+                val_humans, val_queries, _ = self.val_dataset.get_batch(batchsize=self.batchsize)
 
             # train encoder
             for _ in range(self.args.encoder_spi):
@@ -251,19 +250,21 @@ class Learner:
                     val_targets = val_loss_answers.view(-1)
 
                     # compute and aggregate loss
-                    loss += (t+1) * (self.loss(inputs, targets) + torch.mean(torch.square(torch.linalg.norm(beliefs, dim=-1) - 1)))
-                    val_loss += (t+1) * (self.loss(val_inputs, val_targets) + torch.mean(torch.square(torch.linalg.norm(beliefs, dim=-1) - 1)))
+                    loss += (t+1) * (self.loss(inputs, targets)) / self.args.batchsize
+                    loss += (t+1) * torch.sum(torch.square(torch.linalg.norm(beliefs[t], dim=-1) - 1))
+                    val_loss += (t+1) * (self.loss(val_inputs, val_targets)) / self.args.batchsize
+                    val_loss += (t+1) * torch.sum(torch.square(torch.linalg.norm(beliefs[t], dim=-1) - 1))
                         
                 # optimize over iteration
                 self.optimizer.zero_grad()
-                loss.backward()       
+                loss.backward()    
                 self.optimizer.step()  
 
                 # store losses
                 losses.append(loss.item())  
                 val_losses.append(val_loss.item())  
 
-            if self.args.verbose and (n+1) % 100 == 0:
+            if self.args.verbose and (n+1) % 10 == 0:
                 print("Iteration %2d: Loss = %.3f, Val Loss = %.3f" % (n+1, losses[-1], val_losses[-1]))
 
             # train policy
