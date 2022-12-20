@@ -57,6 +57,7 @@ class VAEStorage:
         # get true rewards if None
         if true_rewards is None:
             true_rewards = self.get_random_true_rewards(batchsize=batchsize)
+        assert batchsize == len(true_rewards)
 
         dists = response_dist(self.args, queries, true_rewards)
         answers = []
@@ -71,9 +72,11 @@ class VAEStorage:
         # select the rollouts we want
         return true_rewards, queries, answers
 
-    def get_batch_seq(self, batchsize=5, seqlength=10):
-        # get true rewards for each query sequence
-        true_rewards = self.get_random_true_rewards(batchsize=batchsize)
+    def get_batch_seq(self, batchsize=5, seqlength=10, true_rewards=None):
+        # get true rewards if None
+        if true_rewards is None:
+            true_rewards = self.get_random_true_rewards(batchsize=batchsize)
+        assert batchsize == len(true_rewards)
 
         # generate query and answer sequences
         query_seqs = []
