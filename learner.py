@@ -10,6 +10,7 @@ class Learner:
 
     def __init__(self, args, datasets, policy):
         self.args = args
+        self.batchsize = self.args.batchsize
         self.train_dataset, self.val_dataset, self.test_dataset = datasets
         self.policy = policy(args)
         self.exp_name = args.exp_name
@@ -21,20 +22,24 @@ class Learner:
         self.optimizer = optim.Adam(self.encoder.parameters(), lr=args.lr)
 
         # define loss functions for VAE
-        self.loss = nn.CrossEntropyLoss()
+        self.loss = nn.CrossEntropyLoss(reduction='sum')
         self.mse = nn.MSELoss(reduction='none')
 
         # directory for plots
         if self.args.visualize:
             self.dir = "visualizations/" + self.exp_name + "/" + self.policy.vis_directory
-            makedir(dirname=self.dir)
+            makedir(self.dir)
+
+        # directory for model
+        self.model_dir = "models/" + self.exp_name + "/" + self.policy.vis_directory
+        makedir(self.model_dir)
 
         # test if model can learn on only one true reward
         # same reward used for testing and training
         if self.args.one_reward:
             true_humans, query_seqs, answer_seqs = self.train_dataset.get_batch_seq(batchsize=1, seqlength=self.args.sequence_length)
             self.global_data = (true_humans, query_seqs, answer_seqs)
-            self.args.batchsize = 1
+            self.batchsize = 1
         # TODO remove above later
 
     def pretrain(self): 
@@ -52,10 +57,10 @@ class Learner:
                 # same reward used for testing and training
                 true_humans, query_seqs, answer_seqs = self.global_data
             else:
-                true_humans, query_seqs, answer_seqs = self.train_dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+                true_humans, query_seqs, answer_seqs = self.train_dataset.get_batch_seq(batchsize=self.batchsize, seqlength=self.args.sequence_length)
 
             # initialize hidden and loss variables
-            hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
+            hidden = self.encoder.init_hidden(batchsize=self.batchsize)
             loss = 0
 
             # manually handle hidden inputs for gru for sequence
@@ -107,9 +112,9 @@ class Learner:
             if self.args.one_reward:
                 true_humans, query_seqs, answer_seqs = self.global_data
             else:
-                true_humans, query_seqs, answer_seqs = self.train_dataset.get_batch_seq(batchsize=self.args.batchsize, seqlength=self.args.sequence_length)
+                true_humans, query_seqs, answer_seqs = self.train_dataset.get_batch_seq(batchsize=self.batchsize, seqlength=self.args.sequence_length)
             
-            hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
+            hidden = self.encoder.init_hidden(batchsize=self.batchsize)
 
             for t in range(self.args.sequence_length):
                 queries, answers = query_seqs[t, :, :].unsqueeze(0), answer_seqs[t, :, :].unsqueeze(0)
@@ -174,6 +179,7 @@ class Learner:
         val_losses = []
         # set model to train mode
         self.encoder.train()
+        torch.autograd.set_detect_anomaly(True)
 
         for n in trange(self.args.num_iters):
             # get batch of starting queries for iteration
@@ -184,78 +190,74 @@ class Learner:
                 val_queries, val_answers = query_seqs[-1], answer_seqs[-1]
                 val_humans = true_humans
             else:
-                true_humans, queries, answers = self.train_dataset.get_batch(batchsize=self.args.batchsize)
-                val_humans, val_queries, val_answers = self.val_dataset.get_batch(batchsize=self.args.batchsize)
+                true_humans, queries, answers = self.train_dataset.get_batch(batchsize=self.batchsize)
+                val_humans, val_queries, val_answers = self.val_dataset.get_batch(batchsize=self.batchsize)
 
             # train encoder
             for _ in range(self.args.encoder_spi):
 
+                # get 100 random queries for loss computations 
+                # TODO make parameter
+                _, loss_queries, loss_answers = self.train_dataset.get_batch_seq(batchsize=self.batchsize, seqlength=100, true_rewards=true_humans)
+                _, val_loss_queries, val_loss_answers = self.val_dataset.get_batch_seq(batchsize=self.batchsize, seqlength=100, true_rewards=val_humans)
+
+                # initialize loss variables
+                loss = 0
+                val_loss = 0
+
                 # initialize storage for entire iteration
                 query_seqs = torch.zeros((self.args.sequence_length, *(queries.shape)))
-                answer_seqs = torch.zeros((self.args.sequence_length, *(answers.shape))).to(torch.long)
+                beliefs = torch.zeros((self.args.sequence_length, self.batchsize, self.args.num_features))
                 val_query_seqs = torch.zeros_like(query_seqs)
-                val_answer_seqs = torch.zeros_like(answer_seqs).to(torch.long)
+                val_beliefs = torch.zeros_like(beliefs)
 
                 # set first query in sequences to the batch
                 query_seqs[0] = queries
-                answer_seqs[0] = answers
                 val_query_seqs[0] = val_queries
-                val_answer_seqs[0] = val_answers
 
+                # TODO Refactor so that computation of queries is first, then the loss computation
+
+                # initialize hidden variables
+                hidden = self.encoder.init_hidden(batchsize=self.batchsize)
+                val_hidden = self.encoder.init_hidden(batchsize=self.batchsize)
+
+                # compute query sequence using encoder
                 for t in range(self.args.sequence_length):
-                    # initialize hidden variables
-                    hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
-                    val_hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
-
-                    # manually handle hidden inputs for gru for sequence
-                    query_seq = query_seqs[:(t+1)]
-                    answer_seq = answer_seqs[:(t+1)]
-                    val_query_seq = val_query_seqs[:(t+1)]
-                    val_answer_seq = val_answer_seqs[:(t+1)]
-                    
                     # get beliefs from queries and answers
-                    beliefs, hidden = self.encoder(query_seq, hidden)
-                    val_beliefs, val_hidden = self.encoder(val_query_seq, val_hidden)
-
-                    # compute predicted response at timestep for each query
-                    inputs = response_dist(self.args, query_seq, beliefs)
-                    val_inputs = response_dist(self.args, val_query_seq, val_beliefs)
-
-                    # get inputs and targets for cross entropy loss
-                    inputs = inputs.view(-1, self.args.query_size)
-                    val_inputs = val_inputs.view(-1, self.args.query_size)
-                    targets = answer_seq.view(-1)
-                    val_targets = val_answer_seq.view(-1)
-
-                    # optimize over the current sequence
-                    self.optimizer.zero_grad()
-
-                    # compute loss
-                    loss = self.loss(inputs, targets)
-                    val_loss = self.loss(val_inputs, val_targets)
-
-                    ## NOT SURE IF I SHOULD DO THIS ##
-                    loss *= (t+1)
-                    val_loss *= (t+1)
-                    ##################################
-
-                    loss.backward()       
-                    self.optimizer.step()  
+                    beliefs[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
+                    val_beliefs[t], val_hidden = self.encoder(val_query_seqs[t].clone().unsqueeze(0), val_hidden)
 
                     if t+1 < self.args.sequence_length:
                         # get next queries
                         next_queries = self.policy.run_policy(query_seqs[t], beliefs, self.train_dataset)
                         next_val_queries = self.policy.run_policy(val_query_seqs[t], val_beliefs, self.val_dataset)
 
-                        # get next answers (in the case of an actual human, would be replaced with labeling step)
-                        next_answers = sample_dist(self.args, response_dist(self.args, next_queries, true_humans))
-                        next_val_answers = sample_dist(self.args, response_dist(self.args, next_val_queries, val_humans))
-
-                        # add next queries to sequence
-                        query_seqs[t+1] = next_queries
-                        answer_seqs[t+1] = next_answers    
+                         # add next queries to sequence
+                        query_seqs[t+1] = next_queries 
                         val_query_seqs[t+1] = next_val_queries
-                        val_answer_seqs[t+1] = next_val_answers
+
+                # compute losses over sequence
+                for t in range(self.args.sequence_length):
+                    # compute predicted response for each of the loss queries
+                    inputs = response_dist(self.args, loss_queries, beliefs[t])
+                    val_inputs = response_dist(self.args, val_loss_queries, val_beliefs[t])
+
+                    # get inputs for cross entropy loss
+                    inputs = inputs.view(-1, self.args.query_size)
+                    val_inputs = val_inputs.view(-1, self.args.query_size)
+
+                    # get targets for cross entropy loss
+                    targets = loss_answers.view(-1)
+                    val_targets = val_loss_answers.view(-1)
+
+                    # compute and aggregate loss
+                    loss += (t+1) * (self.loss(inputs, targets) + torch.mean(torch.square(torch.linalg.norm(beliefs, dim=-1) - 1)))
+                    val_loss += (t+1) * (self.loss(val_inputs, val_targets) + torch.mean(torch.square(torch.linalg.norm(beliefs, dim=-1) - 1)))
+                        
+                # optimize over iteration
+                self.optimizer.zero_grad()
+                loss.backward()       
+                self.optimizer.step()  
 
                 # store losses
                 losses.append(loss.item())  
@@ -300,10 +302,10 @@ class Learner:
                 true_humans, query_seqs, answer_seqs = self.global_data
                 queries, answers = query_seqs[0], answer_seqs[0]
             else:
-                true_humans, queries, answers = self.test_dataset.get_batch(batchsize=self.args.batchsize)
+                true_humans, queries, answers = self.test_dataset.get_batch(batchsize=self.batchsize)
 
             # initialize hidden and loss variables
-            hidden = self.encoder.init_hidden(batchsize=self.args.batchsize)
+            hidden = self.encoder.init_hidden(batchsize=self.batchsize)
 
             # manually handle hidden inputs for gru for sequence
             curr_queries = queries.unsqueeze(0)
@@ -322,6 +324,7 @@ class Learner:
                 # compute metrics and store in lists
                 loss = self.loss(inputs, targets)
                 mses = self.mse(beliefs, true_humans)
+                mses = torch.sum(mses, dim=1)
                 align = alignment(beliefs, true_humans)
 
                 test_losses.append(loss.item())
@@ -357,7 +360,7 @@ class Learner:
             plt.savefig(self.dir + "test-loss")
             plt.close()
 
-            if self.args.one_reward or self.args.batchsize <= 1:
+            if self.args.one_reward or self.batchsize <= 1:
                 plt.plot(range(len(mses_mean)), mses_mean)
             else:
                 plt.errorbar(range(len(mses_mean)), mses_mean, yerr=mses_std/(np.sqrt(len(mses_std))))
@@ -367,7 +370,7 @@ class Learner:
             plt.savefig(self.dir + "test-error")
             plt.close()
 
-            if self.args.one_reward or self.args.batchsize <= 1:
+            if self.args.one_reward or self.batchsize <= 1:
                 plt.errorbar(range(len(alignments_mean)), alignments_mean)
             else:
                 plt.errorbar(range(len(alignments_mean)), alignments_mean, yerr=alignments_std/(np.sqrt(len(alignments_std))))
@@ -376,3 +379,6 @@ class Learner:
             plt.title("Test Evaluation - Reward Alignment")
             plt.savefig(self.dir + "test-alignment")
             plt.close()
+
+        # save encoder model
+        torch.save(self.encoder.state_dict(), self.model_dir + "model.pt")
