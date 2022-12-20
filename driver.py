@@ -35,6 +35,10 @@ if args.visualize:
         makedir("visualizations")  
         makedir("visualizations/" + args.exp_name)
 
+#### create directories for models ####
+makedir("models")  
+makedir("models/" + args.exp_name)
+
 #### set up learners for each policy ####
 
 rand_learner = Learner(args, datasets, RandomPolicy)
