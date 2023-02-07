@@ -12,6 +12,14 @@ def makedir(dirname = "visualizations"):
 def distance(x1, x2, y1, y2):
     return np.sqrt((x1-x2)**2 + (y1-y2)**2)
 
+def order_queries(queries, answers):
+    for b in range(len(queries)):
+        # shuffle queries so that the chosen query is first
+        idx = list(range(len(queries[0])))
+        idx.insert(0, idx.pop(answers[b]))
+        queries[b] = queries[b][idx]
+    return queries
+
 class FeatureExtractor:
 
     #return features from a trajectory

@@ -36,7 +36,7 @@ if args.visualize:
         makedir("visualizations/" + args.exp_name)
 
 #### create directories for models ####
-makedir("models")  
+makedir("models")
 makedir("models/" + args.exp_name)
 
 #### set up learners for each policy ####

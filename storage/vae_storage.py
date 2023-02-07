@@ -49,27 +49,22 @@ class VAEStorage:
         idx = np.random.choice(range(self.buffer_len), size, replace=False)
         queries = self.queries[idx, :, :]
         return queries
+
+    def get_answers(self, queries, true_rewards):
+        dists = response_dist(self.args, queries, true_rewards)
+        answers = sample_dist(self.args, dists)
+        return answers
    
     def get_batch(self, batchsize=5, true_rewards=None):
-        # get batchsize queries and responses from dataset
-        queries = self.get_random_queries(batchsize=batchsize)
-
         # get true rewards if None
         if true_rewards is None:
             true_rewards = self.get_random_true_rewards(batchsize=batchsize)
         assert batchsize == len(true_rewards)
 
-        dists = response_dist(self.args, queries, true_rewards)
-        answers = []
-        for b in range(batchsize):
-            answers.append(sample_dist(self.args, dists[b]))
-            # shuffle queries so that the chosen query is first
-            idx = list(range(self.args.query_size))
-            idx.insert(0, idx.pop(answers[b]))
-            queries[b] = queries[b][idx]
-        answers = torch.stack(answers)
+        # get queries and responses from dataset
+        queries = self.get_random_queries(batchsize=batchsize)
+        answers = self.get_answers(queries, true_rewards)
 
-        # select the rollouts we want
         return true_rewards, queries, answers
 
     def get_batch_seq(self, batchsize=5, seqlength=10, true_rewards=None):
