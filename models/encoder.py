@@ -36,19 +36,12 @@ class Encoder(nn.Module):
         self.fc_mu = nn.Linear(curr, args.num_features)
         self.fc_logvar = nn.Linear(curr, args.num_features)
 
-    def reparameterize(self, mu, logvar):
+    def reparameterize(self, mu, logvar, samples=1):
         if self.args.sample_belief:
-            # put batch dimension first
-            mu = mu.transpose(0, 1)
-            logvar = logvar.transpose(0, 1)
-            # shape is batch, 1, num_features
-            std = torch.exp(0.5*logvar).repeat(1, self.args.m, 1)
-            eps = torch.randn_like(std)
-            belief = eps.mul(std).add_(mu.repeat(1, self.args.m, 1))
-            #belief = belief / torch.linalg.norm(belief, dim=-1).unsqueeze(-1)
-            belief = torch.mean(belief, dim=-2)
+            mu = mu.squeeze(0)
+            logvar = logvar.squeeze(0)
+            belief = (torch.randn(samples, self.args.num_features) * torch.sqrt(torch.exp(logvar))) + mu
         else:
-            #belief = mu / torch.linalg.norm(mu, dim=-1).unsqueeze(-1)
             belief = mu
         return belief
 
@@ -80,9 +73,8 @@ class Encoder(nn.Module):
         # output belief distribution and belief sample
         mu = self.fc_mu(output)
         logvar = self.fc_logvar(output)
-        belief = self.reparameterize(mu, logvar)
 
-        return belief, hidden
+        return mu, logvar, hidden
 
     def init_hidden(self, batchsize):
         hidden = torch.zeros((self.args.gru_hidden_layers, batchsize, self.hidden_dim))

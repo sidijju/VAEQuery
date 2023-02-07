@@ -6,7 +6,7 @@ class Policy:
         self.vis_directory = ""
         self.args = args
 
-    def run_policy(self, queries, beliefs, dataset) -> torch.Tensor:
+    def run_policy(self, queries, mus, logvars, dataset) -> torch.Tensor:
         pass
 
     def train_policy(self, dataset, n=1000):
@@ -17,7 +17,7 @@ class RandomPolicy(Policy):
         super().__init__(args)
         self.vis_directory = "random/"
 
-    def run_policy(self, queries, beliefs, dataset) -> torch.Tensor:
+    def run_policy(self, queries, mus, logvars, dataset) -> torch.Tensor:
         return dataset.get_random_queries(self.args.batchsize)
 
 class GreedyPolicy(Policy):
@@ -25,7 +25,7 @@ class GreedyPolicy(Policy):
         super().__init__(args)
         self.vis_directory = "greedy/"
 
-    def run_policy(self, queries, beliefs, dataset) -> torch.Tensor:
+    def run_policy(self, queries, mus, logvars, dataset) -> torch.Tensor:
         raise NotImplementedError
 
 class RLPolicy(Policy):
@@ -33,7 +33,7 @@ class RLPolicy(Policy):
         super().__init__(args, dataset)
         self.vis_directory = "rl/"
     
-    def run_policy(self, queries, beliefs, dataset) -> torch.Tensor:
+    def run_policy(self, queries, mus, logvars, dataset) -> torch.Tensor:
         raise NotImplementedError
 
     def train_policy(self, dataset, n=1000):

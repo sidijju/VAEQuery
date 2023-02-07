@@ -1,9 +1,10 @@
-from utils.helpers import makedir, order_queries
+from utils.helpers import makedir
 from models import encoder
 from torch import optim, nn
 import torch
 import matplotlib.pyplot as plt
 from query.simulate import *
+from storage.vae_storage import *
 from tqdm import trange
 
 class Learner:
@@ -22,7 +23,7 @@ class Learner:
         self.optimizer = optim.Adam(self.encoder.parameters(), lr=args.lr)
 
         # define loss functions for VAE
-        self.loss = nn.CrossEntropyLoss()
+        self.loss = nn.CrossEntropyLoss(reduction = 'sum')
         self.mse = nn.MSELoss(reduction='none')
 
         # directory for plots
@@ -163,11 +164,11 @@ class Learner:
 
                 # get batch of starting queries for iteration
                 true_humans, queries, answers = self.train_dataset.get_batch(batchsize=self.batchsize)
-                queries = order_queries(queries, answers)
 
                 # initialize storage for entire iteration
                 query_seqs = torch.zeros((self.args.sequence_length, *(queries.shape)))
-                beliefs = torch.zeros((self.args.sequence_length, self.batchsize, self.args.num_features))
+                mus = torch.zeros((self.args.sequence_length, self.batchsize, self.args.num_features))
+                logvars = torch.zeros_like(mus)
 
                 # set first query in sequences to the batch
                 query_seqs[0] = queries
@@ -178,16 +179,12 @@ class Learner:
                 # compute query sequence using encoder
                 for t in range(self.args.sequence_length):
                     # get beliefs from queries and answers
-                    beliefs[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
+                    mus[t], logvars[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
                 
                     if t+1 < self.args.sequence_length:
                         # get next queries
-                        next_queries = self.policy.run_policy(query_seqs[t], beliefs, self.train_dataset)
-
-                        # simulate human response
-                        next_answers = self.train_dataset.get_answers(next_queries, true_humans)
-
-                        # reorder queries
+                        next_queries = self.policy.run_policy(query_seqs[t], mus[t], logvars[t], self.train_dataset)
+                        next_answers = respond_queries(self.args, next_queries, true_humans)
                         next_queries = order_queries(next_queries, next_answers)
 
                          # add next queries to sequence
@@ -195,9 +192,6 @@ class Learner:
 
                 # get batch of random queries for loss computations 
                 _, loss_queries, loss_answers = self.train_dataset.get_batch(batchsize=self.batchsize, true_rewards=true_humans)
-                
-                # reorder queries
-                loss_queries = order_queries(loss_queries, loss_answers)
 
                 # initialize loss variables
                 loss = 0
@@ -205,7 +199,8 @@ class Learner:
                 # compute losses over sequence
                 for t in range(self.args.sequence_length):
                     # compute predicted response for each of the loss queries
-                    inputs = response_dist(self.args, loss_queries, beliefs[t])
+                    samples = self.encoder.reparameterize(mus[t], logvars[t])
+                    inputs = response_dist(self.args, loss_queries, samples)
                 
                     # get inputs for cross entropy loss
                     inputs = inputs.view(-1, self.args.query_size)
@@ -215,7 +210,7 @@ class Learner:
                     
                     # compute and aggregate loss
                     loss += (t+1) * self.loss(inputs, targets)
-                    loss += (t+1) * torch.mean(torch.square(torch.linalg.norm(beliefs[t], dim=-1) - 1))
+                    loss += (t+1) * torch.sum(torch.square(torch.linalg.norm(mus[t], dim=-1) - 1))
                     
                 # optimize over iteration
                 self.optimizer.zero_grad()
@@ -259,25 +254,21 @@ class Learner:
             true_humans, queries, answers = self.test_dataset.get_batch(batchsize=self.batchsize)
             hidden = self.encoder.init_hidden(batchsize=self.batchsize)
 
-            # manually handle hidden inputs for gru for sequence
-            curr_queries = queries.unsqueeze(0)
-            curr_answers = answers.unsqueeze(0)
-
             for t in range(self.args.sequence_length):
 
                 # get beliefs from queries and answers
-                beliefs, hidden = self.encoder(curr_queries, hidden)
+                mu, logvar, hidden = self.encoder(queries.clone().unsqueeze(0), hidden)
 
                 # get inputs and targets for cross entropy loss
-                inputs = response_dist(self.args, curr_queries, beliefs)
+                sample = self.encoder.reparameterize(mu, logvar)
+                inputs = response_dist(self.args, queries, sample)
                 inputs = inputs.view(-1, self.args.query_size)
-                targets = curr_answers.view(-1)
+                targets = answers.view(-1)
 
                 # compute metrics and store in lists
-                loss = self.loss(inputs, targets)
-                mses = self.mse(beliefs, true_humans)
-                mses = torch.sum(mses, dim=1)
-                align = alignment(beliefs, true_humans)
+                loss = self.loss(inputs, targets) / self.batchsize
+                mses = torch.sum(self.mse(sample, true_humans), dim=-1) / self.batchsize
+                align = alignment(sample, true_humans)
 
                 test_losses.append(loss.item())
                 mses_mean.append(mses.mean())
@@ -286,13 +277,9 @@ class Learner:
                 alignments_std.append(align.std())
 
                 # get next queries
-                curr_queries = self.policy.run_policy(curr_queries, beliefs, self.test_dataset)
+                queries = self.policy.run_policy(queries, mu, logvar, self.test_dataset)
                 # get next answers (in the case of an actual human, would be replaced with labeling step)
-                curr_answers = self.test_dataset.get_answers(curr_queries, true_humans)
-
-                # reshape to have sequence dim of 1
-                curr_queries = curr_queries.unsqueeze(0)
-                curr_answers = curr_answers.unsqueeze(0)
+                answers = respond_queries(self.args, queries, true_humans)
                     
                 if self.args.verbose:
                     print("Query %2d: Loss = %5.3f, MSE = %5.3f, Alignment = %5.3f" % (t, loss, mses_mean[-1], alignments_mean[-1]))

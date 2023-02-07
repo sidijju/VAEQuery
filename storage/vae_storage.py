@@ -5,6 +5,19 @@ from query.simulate import response_dist, sample_dist
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+def order_queries(queries, answers):
+    for b in range(len(queries)):
+        # shuffle queries so that the chosen query is first
+        idx = list(range(len(queries[0])))
+        idx.insert(0, idx.pop(answers[b]))
+        queries[b] = queries[b][idx]
+    return queries
+
+def respond_queries(args, queries, true_rewards):
+    dists = response_dist(args, queries, true_rewards)
+    answers = sample_dist(args, dists)
+    return answers
+
 class VAEStorage:
 
     # Storage of queries for VAE training
@@ -39,8 +52,8 @@ class VAEStorage:
             self.queries[i] = (self.queries[i] - mean) / std
 
     def get_random_true_rewards(self, batchsize=5):
-        true_rewards = torch.normal(0, 1, (batchsize, self.args.num_features))
-        true_rewards = true_rewards / (torch.norm(true_rewards, dim=-1).unsqueeze(-1))
+        true_rewards = torch.randn(batchsize, self.args.num_features)
+        true_rewards = true_rewards / torch.norm(true_rewards, dim=-1).unsqueeze(-1)
         return true_rewards
 
     def get_random_queries(self, batchsize=5):
@@ -49,11 +62,6 @@ class VAEStorage:
         idx = np.random.choice(range(self.buffer_len), size, replace=False)
         queries = self.queries[idx, :, :]
         return queries
-
-    def get_answers(self, queries, true_rewards):
-        dists = response_dist(self.args, queries, true_rewards)
-        answers = sample_dist(self.args, dists)
-        return answers
    
     def get_batch(self, batchsize=5, true_rewards=None):
         # get true rewards if None
@@ -63,7 +71,8 @@ class VAEStorage:
 
         # get queries and responses from dataset
         queries = self.get_random_queries(batchsize=batchsize)
-        answers = self.get_answers(queries, true_rewards)
+        answers = respond_queries(self.args, queries, true_rewards)
+        queries = order_queries(queries, answers)
 
         return true_rewards, queries, answers
 

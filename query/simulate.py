@@ -11,13 +11,7 @@ def sample_dist(args, dist):
     return sample
 
 def response_dist(args, query, w):
-    w = w.unsqueeze(-2)
-    dist = torch.sum(query * w, dim=-1)
-    # boltzmann rationality
-    dist *= 1/args.temperature
-    # return logits, used in sample_dist later (softmax applied then)
-    return dist
+    return torch.bmm(query, w.unsqueeze(-1)).squeeze(-1) * args.rationality
 
 def alignment(w1, w2):
-    alignments = abs(torch.sum(w1 * w2, dim=-1)/(torch.linalg.norm(w1, dim=-1)*torch.linalg.norm(w2, dim=-1)))
-    return alignments
+    return abs(torch.sum(w1 * w2, dim=-1)/(torch.linalg.norm(w1, dim=-1)*torch.linalg.norm(w2, dim=-1)))
