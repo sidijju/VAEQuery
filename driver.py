@@ -21,40 +21,35 @@ if env == 'gridworld':
     args.env_type = env
     args.exp_name = exp_name
 
-    # collect dataset for the experiments
-    dataset = collect_dataset(args, GridWorld(args))
-    val_dataset = collect_dataset(args, GridWorld(args), mean=dataset.mean, std=dataset.std)
-    test_dataset = collect_dataset(args, GridWorld(args), mean=dataset.mean, std=dataset.std)
-    datasets = (dataset, val_dataset, test_dataset)
+    # collect datasets for the experiments
+    train_dataset = collect_dataset(args, GridWorld(args))
+    test_dataset = collect_dataset(args, GridWorld(args), mean=train_dataset.mean, std=train_dataset.std)
+    datasets = (train_dataset, test_dataset)
 
 else:
     print('Invalid Environment Option')
 
-#### create directories for visualizations ####
-if args.visualize:
-        makedir("visualizations")  
-        makedir("visualizations/" + args.exp_name)
-
-#### create directories for models ####
-makedir("models")
-makedir("models/" + args.exp_name)
+#### create directories for runs ####
+makedir("logs")
+makedir("logs/" + args.exp_name)
+args.log_dir = "logs/" + args.exp_name + "/"
 
 #### set up learners for each policy ####
 
 rand_learner = Learner(args, datasets, RandomPolicy)
-#greedy_learner = Learner(args, dataset, GreedyPolicy) TODO
+greedy_learner = Learner(args, datasets, GreedyPolicy)
 #rl_learner = Learner(args, dataset, RLPolicy) TODO
 
 #### run training for each policy ####
 
-# run training for random policy
+# run training and testing for random policy
 rand_learner.train()
-
-# run testing for random policy
 rand_learner.test()
 
 # run training for greedy policy TODO
 # greedy_learner.train()
+ #greedy_learner.test()
 
 # run training for rl policy TODO
 # rl_learner.train()
+# rl_learner.test()
