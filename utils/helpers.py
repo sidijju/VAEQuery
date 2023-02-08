@@ -58,8 +58,7 @@ class FeatureExtractor:
             #feature 3 - average y distance
             features[3] = sum([distance(0, 0, ob[1], 0) for ob in next_obs])/len(obs)
 
-        #return features
-        return torch.randn((4))
+        return features
 
 def collect_random_trajectory(world):
     world.reset()
@@ -104,3 +103,12 @@ def collect_dataset(args, world, mean=None, std=None):
     
     dataset.normalize_dataset(mean=mean, std=std)
     return dataset
+
+def reparameterize(args, mu, logvar, samples=1):
+    if args.sample_belief:
+        mu = mu.squeeze(0)
+        logvar = logvar.squeeze(0)
+        belief = (torch.randn(samples, args.num_features) * torch.sqrt(torch.exp(logvar))) + mu
+    else:
+        belief = mu
+    return belief
