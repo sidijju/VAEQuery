@@ -72,7 +72,6 @@ class VAEStorage:
         # get queries and responses from dataset
         queries = self.get_random_queries(batchsize=batchsize)
         answers = respond_queries(self.args, queries, true_rewards)
-        queries = order_queries(queries, answers)
 
         return true_rewards, queries, answers
 
