@@ -14,9 +14,9 @@ def args(rest_args):
     parser.set_defaults(verbose=False)
     parser.add_argument('--visualize', dest='visualize', action='store_true')
     parser.set_defaults(visualize=False)
-    parser.add_argument('--optimal_user', dest='optimal_user', action='store_true',
+    parser.add_argument('--nonoptimal_user', dest='optimal_user', action='store_false',
                         help='set user to be optimal based on probability distributions')
-    parser.set_defaults(optimal_user=False)
+    parser.set_defaults(optimal_user=True)
 
     parser.add_argument('--rationality', type=float, default=1,
                         help='Boltzmann rationality temperature')
@@ -37,9 +37,9 @@ def args(rest_args):
                         help='how many trajectories to pre-collect before training begins')
     parser.add_argument('--buffer_size', type=int, default=10000,
                         help='how many trajectories to keep in VAE buffer')
-    parser.add_argument('--pretrain_iters', type=int, default=1000,
+    parser.add_argument('--pretrain_iters', type=int, default=0,
                         help='how many iterations to pretrain the vae')
-    parser.add_argument('--lr', type=float, default=.01)
+    parser.add_argument('--lr', type=float, default=.001)
     parser.add_argument('--batchsize', type=int, default=64,
                         help='how many queries to use for VAE update')
     parser.add_argument('--sequence_length', type=int, default=20,
