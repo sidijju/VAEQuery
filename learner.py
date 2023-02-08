@@ -233,6 +233,8 @@ class Learner:
             plt.savefig(self.dir + "train-loss")
             plt.close()
 
+        return losses
+
     def test(self):
         # evaluate encoder on test batch
         if self.args.verbose:
@@ -295,12 +297,14 @@ class Learner:
             plt.close()
             plt.errorbar(range(len(mses_mean)), mses_mean, yerr=mses_std/(np.sqrt(len(mses_std))))
             plt.xlabel("Queries")
+            plt.xticks(range(1, args.sequence_length+1))
             plt.ylabel("MSE")
             plt.title("Test Evaluation - Reward Error")
             plt.savefig(self.dir + "test-error")
             plt.close()
             plt.errorbar(range(len(alignments_mean)), alignments_mean, yerr=alignments_std/(np.sqrt(len(alignments_std))))
             plt.xlabel("Queries")
+            plt.xticks(range(1, args.sequence_length+1))
             plt.ylabel("Alignment")
             plt.title("Test Evaluation - Reward Alignment")
             plt.savefig(self.dir + "test-alignment")
@@ -308,3 +312,6 @@ class Learner:
 
         # save encoder model
         torch.save(self.encoder.state_dict(), self.dir + "model.pt")
+
+        # return test results
+        return mses_mean, alignments_mean

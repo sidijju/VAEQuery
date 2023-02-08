@@ -4,7 +4,7 @@ from utils.helpers import makedir, collect_dataset
 from policies.policies import RandomPolicy, GreedyPolicy, RLPolicy
 from learner import Learner
 import argparse
-import time
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--env_type', default='gridworld')
@@ -40,16 +40,48 @@ rand_learner = Learner(args, datasets, RandomPolicy)
 greedy_learner = Learner(args, datasets, GreedyPolicy)
 #rl_learner = Learner(args, dataset, RLPolicy) TODO
 
+# set up storage for results
+labels = []
+train_losses = []
+mses = []
+alignments = []
+
 #### run training for each policy ####
 
-# run training and testing for random policy
-rand_learner.train()
-rand_learner.test()
+learners = [rand_learner, greedy_learner]
 
-# run training for greedy policy TODO
-greedy_learner.train()
-greedy_learner.test()
+for learner in learners:
+    # run training and testing for policy
+    train_losses.append(learner.train())
+    mse, align = learner.test()
+    mses.append(mse)
+    alignments.append(align)
+    labels.append(learner.exp_name[:-1])
 
-# run training for rl policy TODO
-# rl_learner.train()
-# rl_learner.test()
+if args.visualize:
+    for i in range(len(train_losses)):
+        plt.plot(train_losses[i], label=labels[i])
+    plt.legend()
+    plt.xlabel("Iterations")
+    plt.ylabel("CE Error")
+    plt.title("Query Distribution vs. Answer Error")
+    plt.savefig(args.log_dir + "losses")
+    plt.close()
+
+    for i in range(len(train_losses)):
+        plt.plot(mses[i], label=labels[i])
+    plt.xlabel("Queries")
+    plt.xticks(range(1, args.sequence_length+1))
+    plt.ylabel("MSE")
+    plt.title("Reward Error")
+    plt.savefig(args.log_dir + "errors")
+    plt.close()
+
+    for i in range(len(train_losses)):
+        plt.plot(alignments[i], label=labels[i])
+    plt.xlabel("Queries")
+    plt.xticks(range(1, args.sequence_length+1))
+    plt.ylabel("Alignment")
+    plt.title("Reward Alignment")
+    plt.savefig(args.log_dir + "alignments")
+    plt.close()
