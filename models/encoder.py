@@ -36,15 +36,6 @@ class Encoder(nn.Module):
         self.fc_mu = nn.Linear(curr, args.num_features)
         self.fc_logvar = nn.Linear(curr, args.num_features)
 
-    def reparameterize(self, mu, logvar, samples=1):
-        if self.args.sample_belief:
-            mu = mu.squeeze(0)
-            logvar = logvar.squeeze(0)
-            belief = (torch.randn(samples, self.args.num_features) * torch.sqrt(torch.exp(logvar))) + mu
-        else:
-            belief = mu
-        return belief
-
     def forward(self, query, hidden):
         # embed all query inputs
         embeddings = self.fc_embedding(query)
