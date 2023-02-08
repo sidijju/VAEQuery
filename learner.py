@@ -195,8 +195,9 @@ class Learner:
                 # compute losses over sequence
                 for t in range(self.args.sequence_length):
                     # compute predicted response for each of the loss queries
-                    samples = reparameterize(mus[t], logvars[t])
-                    inputs = response_dist(self.args, loss_queries, samples)
+                    sample = reparameterize(self.args, mus[t], logvars[t])
+                    sample = sample.squeeze(1)
+                    inputs = response_dist(self.args, loss_queries, sample)
                 
                     # get inputs for cross entropy loss
                     inputs = inputs.view(-1, self.args.query_size)
@@ -257,7 +258,8 @@ class Learner:
                 mu, logvar, hidden = self.encoder(queries.clone().unsqueeze(0), hidden)
 
                 # get inputs and targets for cross entropy loss
-                sample = reparameterize(mu, logvar)
+                sample = reparameterize(self.args, mu, logvar)
+                sample = sample.squeeze(1)
                 inputs = response_dist(self.args, queries, sample)
                 inputs = inputs.view(-1, self.args.query_size)
                 targets = answers.view(-1)

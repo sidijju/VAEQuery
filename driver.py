@@ -47,8 +47,8 @@ rand_learner.train()
 rand_learner.test()
 
 # run training for greedy policy TODO
-# greedy_learner.train()
- #greedy_learner.test()
+greedy_learner.train()
+greedy_learner.test()
 
 # run training for rl policy TODO
 # rl_learner.train()
