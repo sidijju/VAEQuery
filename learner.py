@@ -211,6 +211,7 @@ class Learner:
                     
                 # optimize over iteration
                 self.optimizer.zero_grad()
+                loss /= self.batchsize
                 loss.backward()    
                 self.optimizer.step()  
 
@@ -267,8 +268,8 @@ class Learner:
                 targets = answers.view(-1)
 
                 # compute metrics and store in lists
-                loss = self.loss(inputs, targets)
-                mses = torch.sum(self.mse(sample, true_humans), dim=-1)
+                loss = self.loss(inputs, targets) / self.batchsize
+                mses = torch.sum(self.mse(sample, true_humans), dim=-1) / self.batchsize
                 align = alignment(sample, true_humans)
 
                 test_losses.append(loss.item())
@@ -295,14 +296,14 @@ class Learner:
             plt.title("Test Evaluation - Loss")
             plt.savefig(self.dir + "test-loss")
             plt.close()
-            plt.errorbar(range(len(mses_mean)), mses_mean, yerr=mses_std/(np.sqrt(len(mses_std))))
+            plt.errorbar(range(1, len(mses_mean)+1), mses_mean, yerr=mses_std/(np.sqrt(len(mses_std))))
             plt.xlabel("Queries")
             plt.xticks(range(1, self.args.sequence_length+1))
             plt.ylabel("MSE")
             plt.title("Test Evaluation - Reward Error")
             plt.savefig(self.dir + "test-error")
             plt.close()
-            plt.errorbar(range(len(alignments_mean)), alignments_mean, yerr=alignments_std/(np.sqrt(len(alignments_std))))
+            plt.errorbar(range(1, len(alignments_mean)+1), alignments_mean, yerr=alignments_std/(np.sqrt(len(alignments_std))))
             plt.xlabel("Queries")
             plt.xticks(range(1, self.args.sequence_length+1))
             plt.ylabel("Alignment")
