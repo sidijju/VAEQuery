@@ -3,3 +3,5 @@
 *.png
 *.DS_Store
 *.pt
+*.zip
+events.out.tfevents*
