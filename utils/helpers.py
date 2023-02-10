@@ -58,7 +58,8 @@ class FeatureExtractor:
             #feature 3 - average y distance
             features[3] = sum([distance(0, 0, ob[1], 0) for ob in next_obs])/len(obs)
 
-        return features
+        #return features
+        return torch.randn(self.args.num_features)
 
 def collect_random_trajectory(world):
     world.reset()
