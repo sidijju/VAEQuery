@@ -107,7 +107,7 @@ def collect_dataset(args, world, mean=None, std=None):
 
 def reparameterize(args, mu, logvar, samples=1):
     if args.sample_belief:
-        belief = (torch.randn(samples, args.batchsize, args.num_features) * torch.sqrt(torch.exp(logvar))) + mu
+        belief = (torch.randn(samples, logvar.shape[0], args.num_features) * torch.sqrt(torch.exp(logvar))) + mu
         belief = belief.transpose(0, 1)
     else:
         belief = mu.unsqueeze(1).repeat(1, samples, 1)
