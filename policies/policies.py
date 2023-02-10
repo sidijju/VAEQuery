@@ -80,8 +80,7 @@ class RLStatePolicy(RLPolicy):
         for b in range(mus.shape[0]):
             action, _ = self.model.predict(obs[b])
             queries.append(dataset.queries[action].squeeze(0))
-        queries = torch.stack(queries).squeeze(0)
-        return queries
+        return torch.stack(queries).squeeze(0)
 
     def train_policy(self, dataset, n): 
         self.env = make_vec_env(lambda: metaenvs.QueryActionWorld(self.args, dataset, self.encoder), n_envs=4)
@@ -95,17 +94,16 @@ class RLFeedPolicy(RLPolicy):
         self.model = None
     
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
-        query = dataset.get_random_queries(batchsize=1).squeeze(0).flatten()
-        obs = torch.cat((mus, logvars, query), dim=-1).detach().numpy()
         queries = []
         for b in range(mus.shape[0]):
-            action, _ = self.model.predict(obs[b])
+            query = dataset.get_random_queries(batchsize=1).squeeze(0).flatten()
+            obs = torch.cat((mus[b], logvars[b], query), dim=-1).detach().numpy()
             action, _ = self.model.predict(obs)
             while action != 1:
                 query = dataset.get_random_queries(batchsize=1).squeeze(0).flatten()
-                state = torch.cat((mus, logvars, query), dim=-1)
-                action, _ = self.model.predict(state)
-            queries.append(query)
+                obs[2*self.args.num_features:] = query
+                action, _ = self.model.predict(obs)
+            queries.append(query.reshape(self.args.query_size,-1))
         return torch.stack(queries).squeeze(0)
 
     def train_policy(self, dataset, n): 
