@@ -6,7 +6,7 @@ def args(rest_args):
 
     ##### GENERAL #####
 
-    parser.add_argument('--num_iters', type=int, default=1000)
+    parser.add_argument('--num_iters', type=int, default=100)
     parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--log_dir', type=Path, default=Path('/logs'))
     parser.add_argument('--save_interval', type=int, default=10)
@@ -27,11 +27,11 @@ def args(rest_args):
 
     parser.add_argument('--query_size', type=int, default=2,
                         help='number of trajectories to choose from in one query')
-    parser.add_argument('--policy_spi', type=int, default=1,
+    parser.add_argument('--policy_spi', type=int, default=100,
                         help='number of training steps per iteration for the policy')
 
     ##### VAE #####
-    parser.add_argument('--encoder_spi', type=int, default=1,
+    parser.add_argument('--encoder_spi', type=int, default=10,
                         help='number of training steps per iteration for the encoder')
     parser.add_argument('--precollect_num', type=int, default=1000,
                         help='how many trajectories to pre-collect before training begins')
