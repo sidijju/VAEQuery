@@ -62,7 +62,7 @@ class RLPolicy(Policy):
         makedir(self.log_dir)
         self.model, self.env = None, None
 
-    def train_policy(self, dataset, n=100):
+    def train_policy(self, dataset, n):
         if not self.model:
             self.model = A2C("MlpPolicy", self.env, verbose=1, tensorboard_log=self.log_dir, learning_rate=self.args.lr)
         else:
@@ -83,7 +83,7 @@ class RLStatePolicy(RLPolicy):
         queries = torch.stack(queries).squeeze(0)
         return queries
 
-    def train_policy(self, dataset, n=100): 
+    def train_policy(self, dataset, n): 
         self.env = make_vec_env(lambda: metaenvs.QueryActionWorld(self.args, dataset, self.encoder), n_envs=4)
         super().train_policy(dataset, n)
 
@@ -96,14 +96,18 @@ class RLFeedPolicy(RLPolicy):
     
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
         query = dataset.get_random_queries(batchsize=1).squeeze(0).flatten()
-        state = torch.cat((mus, logvars, query), dim=-1)
-        action, _ = self.model.predict(state)
-        while action != 1:
-            query = dataset.get_random_queries(batchsize=1).squeeze(0).flatten()
-            state = torch.cat((mus, logvars, query), dim=-1)
-            action, _ = self.model.predict(state)
-        return query.reshape((self.args.query_size,-1))
+        obs = torch.cat((mus, logvars, query), dim=-1).detach().numpy()
+        queries = []
+        for b in range(mus.shape[0]):
+            action, _ = self.model.predict(obs[b])
+            action, _ = self.model.predict(obs)
+            while action != 1:
+                query = dataset.get_random_queries(batchsize=1).squeeze(0).flatten()
+                state = torch.cat((mus, logvars, query), dim=-1)
+                action, _ = self.model.predict(state)
+            queries.append(query)
+        return torch.stack(queries).squeeze(0)
 
-    def train_policy(self, dataset, n=100): 
+    def train_policy(self, dataset, n): 
         self.env = make_vec_env(lambda: metaenvs.QueryStateWorld(self.args, dataset, self.encoder), n_envs=4)
         super().train_policy(dataset, n)
