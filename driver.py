@@ -1,7 +1,7 @@
 from environments.envs import *
 from configs import gridworld
 from utils.helpers import makedir, collect_dataset
-from policies.policies import RandomPolicy, GreedyPolicy, RLPolicy
+from policies.policies import *
 from learner import Learner
 import argparse
 import matplotlib.pyplot as plt
@@ -38,7 +38,8 @@ args.log_dir = "logs/" + args.exp_name + "/"
 
 rand_learner = Learner(args, datasets, RandomPolicy)
 greedy_learner = Learner(args, datasets, GreedyPolicy)
-#rl_learner = Learner(args, dataset, RLPolicy) TODO
+rl_learner = Learner(args, datasets, RLStatePolicy)
+rl_feed_learner = Learner(args, datasets, RLFeedPolicy)
 
 # set up storage for results
 labels = []
@@ -48,7 +49,7 @@ alignments = []
 
 #### run training for each policy ####
 
-learners = [rand_learner, greedy_learner]
+learners = [rand_learner, greedy_learner, rl_learner]
 
 for learner in learners:
     # run training and testing for policy
@@ -56,7 +57,7 @@ for learner in learners:
     mse, align = learner.test()
     mses.append(mse)
     alignments.append(align)
-    labels.append(learner.exp_name[:-1])
+    labels.append(learner.policy.vis_directory[:-1])
 
 if args.visualize:
     for i in range(len(train_losses)):
@@ -70,6 +71,7 @@ if args.visualize:
 
     for i in range(len(train_losses)):
         plt.plot(mses[i], label=labels[i])
+    plt.legend()
     plt.xlabel("Queries")
     plt.xticks(range(1, args.sequence_length+1))
     plt.ylabel("MSE")
@@ -79,6 +81,7 @@ if args.visualize:
 
     for i in range(len(train_losses)):
         plt.plot(alignments[i], label=labels[i])
+    plt.legend()
     plt.xlabel("Queries")
     plt.xticks(range(1, args.sequence_length+1))
     plt.ylabel("Alignment")

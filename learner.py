@@ -13,11 +13,13 @@ class Learner:
         self.args = args
         self.batchsize = self.args.batchsize
         self.train_dataset, self.test_dataset = datasets
-        self.policy = policy(args)
         self.exp_name = args.exp_name
 
          # initialize encoder network
         self.encoder = encoder.Encoder(args)
+
+        # initialize policy
+        self.policy = policy(args, self.encoder)
 
         # initialize optimizer for model
         self.optimizer = optim.Adam(self.encoder.parameters(), lr=args.lr)
@@ -154,6 +156,9 @@ class Learner:
 
         for n in trange(self.args.num_iters):
 
+            # train policy
+            self.policy.train_policy(self.train_dataset, n=self.args.policy_spi)
+
             # train encoder
             for _ in range(self.args.encoder_spi):
 
@@ -220,9 +225,6 @@ class Learner:
 
             if self.args.verbose and (n+1) % 10 == 0:
                 print("\nIteration %2d: Loss = %.3f" % (n+1, losses[-1]))
-
-            # train policy
-            self.policy.train_policy(self.train_dataset, n=self.args.policy_spi)
        
         # save plots for losses after training
         if self.args.visualize:
