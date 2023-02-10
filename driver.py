@@ -49,7 +49,7 @@ alignments = []
 
 #### run training for each policy ####
 
-learners = [rand_learner, greedy_learner, rl_learner]
+learners = [rand_learner, greedy_learner, rl_learner, rl_feed_learner]
 
 for learner in learners:
     # run training and testing for policy

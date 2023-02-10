@@ -90,7 +90,7 @@ class RLFeedPolicy(RLPolicy):
     def __init__(self, *args):
         super().__init__(*args)
         self.vis_directory = "rl-feed/"
-        self.log_dir = "logs/" + self.args.exp_name + self.vis_directory
+        self.log_dir = "logs/" + self.args.exp_name + "/" + self.vis_directory
         self.model = None
     
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
