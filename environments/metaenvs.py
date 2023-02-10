@@ -20,6 +20,16 @@ class QueryWorld(gym.Env):
         self.true_human = self.dataset.get_random_true_rewards(batchsize=1)
         self.hidden = self.encoder.init_hidden(batchsize=1)
 
+    def step(self, action):
+        self.step_count += 1
+        query = self.dataset.queries[action].unsqueeze(0).clone()
+        answer = sample_dist(self.args, response_dist(self.args, query, self.true_human)).squeeze(0)
+        mu, logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
+        reward = self.reward_function(query, answer, mu, logvar)
+        self.state[:self.args.num_features] = mu.detach().numpy()
+        self.state[self.args.num_features:2*self.args.num_features] = logvar.detach().numpy()
+        return reward
+
     def reward_function(self, query, answer, mus, logvars):
         samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
         rew = torch.exp(torch.bmm(query, samples.mT))
@@ -43,13 +53,7 @@ class QueryActionWorld(QueryWorld):
 
     def step(self, action):
         if self.step_count < self.horizon:
-            self.step_count += 1
-            query = self.dataset.queries[action].unsqueeze(0).clone()
-            answer = sample_dist(self.args, response_dist(self.args, query, self.true_human)).squeeze(0)
-            mu, logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
-            reward = self.reward_function(query, answer, mu, logvar)
-            self.state[:self.args.num_features] = mu.detach().numpy()
-            self.state[self.args.num_features:] = logvar.detach().numpy()
+            reward = super().step(action)
         else:
             reward = 0
 
@@ -76,13 +80,7 @@ class QueryStateWorld(QueryWorld):
     def step(self, action):
         if self.step_count < self.horizon:
             if action == 1:
-                self.step_count += 1
-                query = self.dataset.queries[action]
-                answer = sample_dist(self.args, response_dist(self.args, query, self.true_human)).squeeze(0)
-                mu, logvar, self.hidden = self.encoder(query, self.hidden)
-                reward = self.reward_function(query, answer, mu, logvar)
-                self.state[:self.args.num_features] = mu
-                self.state[self.args.num_features:] = logvar
+                reward = super().step(action)
             else:
                 reward = 0
 
