@@ -27,7 +27,7 @@ def args(rest_args):
 
     parser.add_argument('--query_size', type=int, default=2,
                         help='number of trajectories to choose from in one query')
-    parser.add_argument('--policy_spi', type=int, default=1000,
+    parser.add_argument('--policy_spi', type=int, default=2000,
                         help='number of training steps per iteration for the policy')
 
     ##### VAE #####
