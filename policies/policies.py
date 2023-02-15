@@ -101,12 +101,10 @@ class RLFeedPolicy(RLPolicy):
             query = dataset.get_random_queries(batchsize=1).squeeze(0).flatten()
             obs = torch.cat((mus[b], logvars[b], query), dim=-1).detach().numpy()
             action, _ = self.model.predict(obs)
-            count = 0
-            while action != 1 and count < 60:
+            while action != 1:
                 query = dataset.get_random_queries(batchsize=1).squeeze(0).flatten()
                 obs[2*self.args.num_features:] = query.clone()
                 action, _ = self.model.predict(obs)
-                count += 1
             queries.append(query.reshape(self.args.query_size,-1))
         return torch.stack(queries).squeeze(0)
 
