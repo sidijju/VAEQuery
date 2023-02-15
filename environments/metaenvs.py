@@ -20,16 +20,6 @@ class QueryWorld(gym.Env):
         self.true_human = self.dataset.get_random_true_rewards(batchsize=1)
         self.hidden = self.encoder.init_hidden(batchsize=1)
 
-    def step(self, action):
-        self.step_count += 1
-        query = self.dataset.queries[action].unsqueeze(0).clone()
-        answer = sample_dist(self.args, response_dist(self.args, query, self.true_human)).squeeze(0)
-        mu, logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
-        reward = self.reward_function(query, answer, mu, logvar)
-        self.state[:self.args.num_features] = mu.detach().numpy()
-        self.state[self.args.num_features:2*self.args.num_features] = logvar.detach().numpy()
-        return reward
-
     def reward_function(self, query, answer, mus, logvars):
         samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
         rew = torch.exp(torch.bmm(query, samples.mT))
@@ -53,7 +43,13 @@ class QueryActionWorld(QueryWorld):
 
     def step(self, action):
         if self.step_count < self.horizon:
-            reward = super().step(action)
+            self.step_count += 1
+            query = self.dataset.queries[action].unsqueeze(0).clone()
+            answer = sample_dist(self.args, response_dist(self.args, query, self.true_human)).squeeze(0)
+            mu, logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
+            reward = self.reward_function(query, answer, mu, logvar)
+            self.state[:self.args.num_features] = mu.detach().numpy()
+            self.state[self.args.num_features:2*self.args.num_features] = logvar.detach().numpy()
         else:
             reward = 0
 
@@ -73,20 +69,25 @@ class QueryStateWorld(QueryWorld):
     
     def reset(self):
         super().reset()
-        query = self.dataset.get_random_queries(batchsize=1).squeeze(0)
-        self.state[2*self.args.num_features:] = query.flatten()
+        self.query = self.dataset.get_random_queries(batchsize=1)
+        self.state[2*self.args.num_features:] = self.query.squeeze(0).flatten()
         return self.state
 
     def step(self, action):
         if self.step_count < self.horizon:
             if action == 1:
-                reward = super().step(action)
+                self.step_count += 1
+                answer = sample_dist(self.args, response_dist(self.args, self.query, self.true_human)).squeeze(0)
+                mu, logvar, self.hidden = self.encoder(self.query.unsqueeze(0), self.hidden)
+                reward = self.reward_function(self.query, answer, mu, logvar)
+                self.state[:self.args.num_features] = mu.detach().numpy()
+                self.state[self.args.num_features:2*self.args.num_features] = logvar.detach().numpy()
             else:
                 reward = 0
 
             # replace old query in state
-            query = self.dataset.get_random_queries(batchsize=1).squeeze(0)
-            self.state[2*self.args.num_features:] = query.flatten()
+            self.query = self.dataset.get_random_queries(batchsize=1)
+            self.state[2*self.args.num_features:] = self.query.squeeze(0).flatten()
         else:
             reward = 0
 
