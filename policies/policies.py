@@ -74,6 +74,7 @@ class RLStatePolicy(RLPolicy):
     def __init__(self, *args):
         super().__init__(*args)
 
+    # TODO write batched version of this method
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
         obs = torch.cat((mus, logvars), dim=-1).detach().numpy()
         queries = []
@@ -93,6 +94,7 @@ class RLFeedPolicy(RLPolicy):
         self.log_dir = "logs/" + self.args.exp_name + "/" + self.vis_directory
         self.model = None
     
+    # TODO write batched version of this method
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
         queries = []
         mus = mus.squeeze(0)
