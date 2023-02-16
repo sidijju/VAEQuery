@@ -7,7 +7,6 @@ from utils.helpers import makedir
 
 class Policy:
     def __init__(self, args, encoder):
-        self.vis_directory = ""
         self.args = args
         self.encoder = encoder
 
@@ -57,7 +56,6 @@ class GreedyPolicy(Policy):
 class RLPolicy(Policy):
     def __init__(self, *args):
         super().__init__(*args)
-        self.vis_directory = "rl/"
         self.log_dir = "logs/" + self.args.exp_name + "/" + self.vis_directory
         makedir(self.log_dir)
         self.model, self.env = None, None
@@ -67,11 +65,12 @@ class RLPolicy(Policy):
             self.model = A2C("MlpPolicy", self.env, verbose=1, tensorboard_log=self.log_dir, learning_rate=self.args.lr)
         else:
             self.model.set_env(self.env)
-        self.model.learn(total_timesteps=n, log_interval=10, progress_bar=True, tb_log_name="def", reset_num_timesteps=False)
+        self.model.learn(total_timesteps=n, log_interval=10, tb_log_name="def", reset_num_timesteps=False)
         self.model.save(self.log_dir + "/model")
 
 class RLStatePolicy(RLPolicy):
     def __init__(self, *args):
+        self.vis_directory = "rl/"
         super().__init__(*args)
 
     # TODO write batched version of this method
@@ -89,11 +88,9 @@ class RLStatePolicy(RLPolicy):
 
 class RLFeedPolicy(RLPolicy):
     def __init__(self, *args):
-        super().__init__(*args)
         self.vis_directory = "rl-feed/"
-        self.log_dir = "logs/" + self.args.exp_name + "/" + self.vis_directory
-        self.model = None
-    
+        super().__init__(*args)
+        
     # TODO write batched version of this method
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
         queries = []
