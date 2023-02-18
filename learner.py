@@ -26,7 +26,7 @@ class Learner:
 
         # define loss functions for VAE
         self.loss = nn.CrossEntropyLoss(reduction = 'sum')
-        self.mse = nn.MSELoss(reduction='none')
+        self.mse = nn.MSELoss()
 
         # directory for logs
         self.dir = self.args.log_dir + self.policy.vis_directory
@@ -271,14 +271,14 @@ class Learner:
 
                 # compute metrics and store in lists
                 loss = self.loss(inputs, targets) / self.batchsize
-                mses = torch.sum(self.mse(sample, true_humans), dim=-1) / self.batchsize
+                mses = self.mse(sample, true_humans)
+
+                # TODO do this over a batch of samples
                 align = alignment(sample, true_humans)
 
                 test_losses.append(loss.item())
                 mses_mean.append(mses.mean())
-                mses_std.append(mses.std())
                 alignments_mean.append(align.mean())
-                alignments_std.append(align.std())
 
                 # get next queries
                 queries = self.policy.run_policy(mu, logvar, self.test_dataset)
@@ -298,14 +298,14 @@ class Learner:
             plt.title("Test Evaluation - Loss")
             plt.savefig(self.dir + "test-loss")
             plt.close()
-            plt.errorbar(range(1, len(mses_mean)+1), mses_mean, yerr=mses_std/(np.sqrt(len(mses_std))))
+            plt.plot(range(1, len(mses_mean)+1), mses_mean)
             plt.xlabel("Queries")
             plt.xticks(range(1, self.args.sequence_length+1))
             plt.ylabel("MSE")
             plt.title("Test Evaluation - Reward Error")
             plt.savefig(self.dir + "test-error")
             plt.close()
-            plt.errorbar(range(1, len(alignments_mean)+1), alignments_mean, yerr=alignments_std/(np.sqrt(len(alignments_std))))
+            plt.plot(range(1, len(alignments_mean)+1), alignments_mean)
             plt.xlabel("Queries")
             plt.xticks(range(1, self.args.sequence_length+1))
             plt.ylabel("Alignment")
