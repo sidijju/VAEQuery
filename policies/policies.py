@@ -33,26 +33,19 @@ class GreedyPolicy(Policy):
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
         queries = dataset.queries[:dataset.buffer_len]
         samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
-        queries_chosen = []
-        for i in range(self.args.batchsize):
-            rews = torch.exp(torch.matmul(queries, samples[i].T))
-            denoms = torch.sum(rews, dim=-2).unsqueeze(-2)
-            posteriors = rews/denoms
-            # posteriors is P(q | Q, w) for all q, Q, and w
-            mutual_answers = []
-            for answer in range(self.args.query_size):
-                # sum for this answer over all w
-                sample_total = torch.sum(posteriors[:, answer, :], dim=-1).unsqueeze(-1)
-                assert sample_total.shape == (dataset.buffer_len, 1)
-                inter = self.args.m * posteriors[:, answer, :] / sample_total
-                log2 = torch.log2(inter)
-                mutual = torch.sum(posteriors[:, answer, :] * log2, dim=-1)
-                assert mutual.shape == (dataset.buffer_len,)
-                mutual_answers.append(mutual)
-            query_vals = -1.0/self.args.m * torch.sum(torch.stack(mutual_answers), dim=0)
-            queries_chosen.append(queries[torch.argmin(query_vals, dim=-1)])
-        return torch.stack(queries_chosen)
-
+        rews = torch.einsum('qij, bmj -> bqim', queries, samples)
+        rews = torch.exp(rews)
+        denoms = torch.sum(rews, dim=-2).unsqueeze(-2)
+        posteriors = rews/denoms
+        mutual_answers = []
+        for answer in range(self.args.query_size):
+            sample_total = torch.sum(posteriors[:, :, answer, :], dim=-1).unsqueeze(-1)
+            logmean = torch.log2(self.args.m * posteriors[:, :, answer, :] / sample_total)
+            mutual = torch.sum(posteriors[:, :, answer, :] * logmean, dim=-1)
+            mutual_answers.append(mutual)
+        query_vals = -1.0/self.args.m * torch.sum(torch.stack(mutual_answers), dim=0)
+        queries_chosen = queries[torch.argmin(query_vals, dim=-1)]
+        return queries_chosen
 class RLPolicy(Policy):
     def __init__(self, *args):
         super().__init__(*args)
