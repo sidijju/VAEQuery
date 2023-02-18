@@ -29,7 +29,6 @@ class GreedyPolicy(Policy):
         super().__init__(*args)
         self.vis_directory = "greedy/"
 
-    # TODO write batched version of this method
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
         queries = dataset.queries[:dataset.buffer_len]
         samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
