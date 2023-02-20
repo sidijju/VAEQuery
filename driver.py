@@ -16,8 +16,8 @@ exp_name = args.exp_name
 #### set up argument variables ####
 if env == 'gridworld':
     args = gridworld.args(rargs)
-    #args.num_features = 6
-    args.num_features = 4
+    args.num_features = 6
+    #args.num_features = 4
     args.env_type = env
     args.exp_name = exp_name
 
@@ -64,8 +64,8 @@ if args.visualize:
         plt.plot(train_losses[i], label=labels[i])
     plt.legend()
     plt.xlabel("Iterations")
-    plt.ylabel("CE Error")
-    plt.title("Query Distribution vs. Answer Error")
+    plt.ylabel("Error")
+    plt.title("Loss over Training")
     plt.savefig(args.log_dir + "losses")
     plt.close()
 
