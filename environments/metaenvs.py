@@ -102,8 +102,8 @@ class QueryStateWorld(QueryWorld):
             if action == 1:
                 self.step_count += 1
                 answer = sample_dist(self.args, response_dist(self.args, self.query, self.true_human)).squeeze(0)
-                reward = self.reward_function(query, answer, self.mu, self.logvar)
                 query = order_queries(self.query, answer)
+                reward = self.reward_function(query, 0, self.mu, self.logvar)
                 self.mu, self.logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
                 self.state[:self.args.num_features] = self.mu.detach().numpy()
                 self.state[self.args.num_features:2*self.args.num_features] = self.logvar.detach().numpy()
