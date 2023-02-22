@@ -28,16 +28,6 @@ class QueryWorld(gym.Env):
         self.state[self.args.num_features:2*self.args.num_features] = self.logvar.detach().numpy()
 
     def reward_function(self, query, answer, mus, logvars):
-        # TODO change reward formulation
-        # # old reward formulation
-        # samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
-        # rew = torch.exp(torch.bmm(query, samples.mT))
-        # denom = torch.sum(rew, dim=-2).unsqueeze(-2)
-        # posterior = rew/denom
-        # reward = torch.mean(torch.log2(posterior[:, answer]), dim=-1) - torch.log2(torch.mean(posterior[:, answer], dim=-1))
-        # return reward.item()
-
-        # new reward formulation
         samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
         rew = torch.exp(torch.bmm(query, samples.mT))
         denom = torch.sum(rew, dim=-2).unsqueeze(-2)
@@ -46,7 +36,6 @@ class QueryWorld(gym.Env):
         
         dist = torch.distributions.MultivariateNormal(mus.squeeze(), torch.diag(torch.exp(logvars).squeeze()))
         logprobs = dist.log_prob(samples.squeeze())
-        #print(torch.exp(logprobs))
         lognum = (logprobs + torch.log2(posterior.squeeze(1)) - torch.log2(posterior_sum/self.args.m))
         reward = torch.sum(posterior.squeeze(1) * lognum, dim=-1)/posterior_sum - torch.sum(logprobs, dim=-1)/self.args.m
         return reward.item()
