@@ -17,6 +17,7 @@ class Learner:
 
          # initialize encoder network
         self.encoder = encoder.Encoder(args)
+        self.encoder.to(self.args.device)
 
         # initialize policy
         self.policy = policy(args, self.encoder)
@@ -167,9 +168,9 @@ class Learner:
                 queries = order_queries(queries, answers)
 
                 # initialize storage for entire iteration
-                query_seqs = torch.zeros((self.args.sequence_length, *(queries.shape)))
-                mus = torch.zeros((self.args.sequence_length, self.batchsize, self.args.num_features))
-                logvars = torch.zeros_like(mus)
+                query_seqs = torch.zeros((self.args.sequence_length, *(queries.shape))).to(self.args.device)
+                mus = torch.zeros((self.args.sequence_length, self.batchsize, self.args.num_features)).to(self.args.device)
+                logvars = torch.zeros_like(mus).to(self.args.device)
 
                 # set first query in sequences to the batch
                 query_seqs[0] = queries
@@ -189,7 +190,7 @@ class Learner:
                         next_queries = order_queries(next_queries, next_answers)
 
                          # add next queries to sequence
-                        query_seqs[t+1] = next_queries 
+                        query_seqs[t+1] = next_queries
 
                 # get batch of random queries for loss computations 
                 _, loss_queries, loss_answers = self.train_dataset.get_batch(batchsize=self.batchsize, true_rewards=true_humans)
@@ -280,8 +281,8 @@ class Learner:
                 align = alignment(sample, true_humans)
 
                 test_losses.append(loss.item())
-                mses_mean.append(mses.mean())
-                alignments_mean.append(align.mean())
+                mses_mean.append(mses.mean().cpu())
+                alignments_mean.append(align.mean().cpu())
 
                 # get next queries
                 queries = self.policy.run_policy(mu, logvar, self.test_dataset)
