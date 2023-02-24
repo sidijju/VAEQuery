@@ -68,7 +68,7 @@ class RLStatePolicy(RLPolicy):
 
     # TODO write batched version of this method
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
-        obs = torch.cat((mus, logvars), dim=-1).detach().numpy()
+        obs = torch.cat((mus, logvars), dim=-1).cpu().detach().numpy()
         queries = []
         for b in range(mus.shape[0]):
             action, _ = self.model.predict(obs[b])
@@ -91,7 +91,8 @@ class RLFeedPolicy(RLPolicy):
         logvars = logvars.squeeze(0)
         for b in range(mus.shape[0]):
             query = dataset.get_random_queries(batchsize=1).squeeze(0).flatten()
-            obs = torch.cat((mus[b], logvars[b], query), dim=-1).detach().numpy()
+            obs = torch.cat((mus[b], logvars[b], query), dim=-1)
+            # .cpu().detach().numpy()
             action, _ = self.model.predict(obs)
             while action != 1:
                 query = dataset.get_random_queries(batchsize=1).squeeze(0).flatten()

@@ -21,10 +21,12 @@ class QueryWorld(gym.Env):
         self.true_human = self.dataset.get_random_true_rewards(batchsize=1)
         self.hidden = self.encoder.init_hidden(batchsize=1)
 
-        self.mu = torch.zeros((1, 1, self.args.num_features)).to(self.args.device)
-        self.logvar = torch.zeros((1, 1, self.args.num_features)).to(self.args.device)
+        self.mu = torch.zeros((1, 1, self.args.num_features))
+        self.logvar = torch.zeros((1, 1, self.args.num_features))
         self.state[:self.args.num_features] = self.mu.detach().numpy()
         self.state[self.args.num_features:2*self.args.num_features] = self.logvar.detach().numpy()
+        self.mu = self.mu.to(self.args.device)
+        self.logvar = self.logvar.to(self.args.device)
 
     def reward_function(self, query, answer, mus, logvars):
         samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
@@ -60,8 +62,10 @@ class QueryActionWorld(QueryWorld):
             reward = self.reward_function(query, answer, self.mu, self.logvar)
             query = order_queries(query, answer)
             self.mu, self.logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
-            self.state[:self.args.num_features] = self.mu.detach().numpy()
-            self.state[self.args.num_features:2*self.args.num_features] = self.logvar.detach().numpy()
+            self.state[:self.args.num_features] = self.mu.cpu().detach().numpy()
+            self.state[self.args.num_features:2*self.args.num_features] = self.logvar.cpu().detach().numpy()
+            self.mu = self.mu.to(self.args.device)
+            self.logvar = self.logvar.to(self.args.device)
         else:
             reward = 0
 
@@ -82,7 +86,8 @@ class QueryStateWorld(QueryWorld):
     def reset(self):
         super().reset()
         self.query = self.dataset.get_random_queries(batchsize=1)
-        self.state[2*self.args.num_features:] = self.query.squeeze(0).flatten()
+        self.state[2*self.args.num_features:] = self.query.squeeze(0).flatten().cpu()
+        self.query = self.query.to(self.args.device)
         return self.state
 
     def step(self, action):
