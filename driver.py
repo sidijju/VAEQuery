@@ -54,9 +54,7 @@ alignments = []
 
 #### run training for each policy ####
 
-#learners = [rand_learner, greedy_learner, rl_learner, rl_feed_learner]
-
-learners = [rl_learner, rl_feed_learner]
+learners = [rand_learner, greedy_learner, rl_learner, rl_feed_learner]
 
 # get shared test batch for all learners
 test_batch = test_dataset.get_batch(batchsize=args.batchsize)

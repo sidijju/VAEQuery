@@ -98,14 +98,17 @@ class QueryStateWorld(QueryWorld):
                 query = order_queries(self.query, answer)
                 reward = self.reward_function(query, 0, self.mu, self.logvar)
                 self.mu, self.logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
-                self.state[:self.args.num_features] = self.mu.detach().numpy()
-                self.state[self.args.num_features:2*self.args.num_features] = self.logvar.detach().numpy()
+                self.state[:self.args.num_features] = self.mu.cpu().detach().numpy()
+                self.state[self.args.num_features:2*self.args.num_features] = self.logvar.cpu().detach().numpy()
+                self.mu = self.mu.to(self.args.device)
+                self.logvar = self.logvar.to(self.args.device)
             else:
                 reward = 0
 
             # replace old query in state
             self.query = self.dataset.get_random_queries(batchsize=1)
-            self.state[2*self.args.num_features:] = self.query.squeeze(0).flatten()
+            self.state[2*self.args.num_features:] = self.query.squeeze(0).flatten().cpu()
+            self.query = self.query.to(self.args.device)
         else:
             reward = 0
 
