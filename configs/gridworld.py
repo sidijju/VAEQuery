@@ -7,7 +7,7 @@ def args(rest_args):
     ##### GENERAL #####
 
     parser.add_argument('--num_iters', type=int, default=100)
-    parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--log_dir', type=Path, default=Path('/logs'))
     parser.add_argument('--save_interval', type=int, default=10)
     parser.add_argument('--verbose', dest='verbose', action='store_true')
