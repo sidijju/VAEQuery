@@ -238,7 +238,7 @@ class Learner:
 
         return losses
 
-    def test(self):
+    def test(self, batch=None):
         # evaluate encoder on test batch
         if self.args.verbose:
             print("######### TESTING #########")
@@ -248,15 +248,18 @@ class Learner:
             
         test_losses = []
         mses_mean = []
-        mses_std = []
         alignments_mean = []
-        alignments_std = []
         
         with torch.no_grad():
-            true_humans, queries, answers = self.test_dataset.get_batch(batchsize=self.batchsize)
-            queries = order_queries(queries, answers)
-            hidden = self.encoder.init_hidden(batchsize=self.batchsize)
 
+            if batch:
+                true_humans, orig_queries, answers = batch
+                queries = order_queries(orig_queries, answers)
+            else:
+                true_humans, queries, answers = self.test_dataset.get_batch(batchsize=self.batchsize)
+                queries = order_queries(queries, answers)
+
+            hidden = self.encoder.init_hidden(batchsize=self.batchsize)
             for t in range(self.args.sequence_length):
 
                 # get beliefs from queries and answers
