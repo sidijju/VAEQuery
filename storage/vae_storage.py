@@ -6,12 +6,13 @@ from query.simulate import response_dist, sample_dist
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def order_queries(queries, answers):
+    ordered_queries = torch.zeros_like(queries)
     for b in range(len(queries)):
         # shuffle queries so that the chosen query is first
         idx = list(range(len(queries[0])))
         idx.insert(0, idx.pop(answers[b]))
-        queries[b] = queries[b][idx]
-    return queries
+        ordered_queries[b] = queries[b][idx]
+    return ordered_queries
 
 def respond_queries(args, queries, true_rewards):
     dists = response_dist(args, queries, true_rewards)
