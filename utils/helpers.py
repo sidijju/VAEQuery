@@ -112,3 +112,16 @@ def reparameterize(args, mu, logvar, samples=1):
     else:
         belief = mu.unsqueeze(1).repeat(1, samples, 1)
     return belief
+
+def set_seed(seed = 1) -> None:
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+
+    # When running on the CuDNN backend, two further options must be set
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+    # hash seed for list and dictionary orderings
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    print(f"Random seed set as {seed}")

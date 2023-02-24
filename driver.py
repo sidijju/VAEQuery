@@ -1,6 +1,6 @@
 from environments.envs import *
 from configs import gridworld
-from utils.helpers import makedir, collect_dataset
+from utils.helpers import makedir, collect_dataset, set_seed
 from policies.policies import *
 from learner import Learner
 import argparse
@@ -21,12 +21,16 @@ if env == 'gridworld':
     args.env_type = env
     args.exp_name = exp_name
 
+    # set up random seed
+    set_seed(args.seed)
+
     # collect datasets for the experiments
     train_dataset = collect_dataset(args, GridWorld(args))
     test_dataset = collect_dataset(args, GridWorld(args), mean=train_dataset.mean, std=train_dataset.std)
     datasets = (train_dataset, test_dataset)
 
 else:
+    # TODO add more environments
     print('Invalid Environment Option')
 
 #### create directories for runs ####
@@ -51,10 +55,13 @@ alignments = []
 
 learners = [rand_learner, greedy_learner, rl_learner, rl_feed_learner]
 
+# get shared test batch for all learners
+test_batch = test_dataset.get_batch(batchsize=args.batchsize)
+
 for learner in learners:
     # run training and testing for policy
     train_losses.append(learner.train())
-    mse, align = learner.test()
+    mse, align = learner.test(batch=test_batch)
     mses.append(mse)
     alignments.append(align)
     labels.append(learner.policy.vis_directory[:-1])
