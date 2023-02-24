@@ -59,7 +59,7 @@ class FeatureExtractor:
             features[3] = sum([distance(0, 0, ob[1], 0) for ob in next_obs])/len(obs)
 
         #return features
-        return torch.randn(self.args.num_features)
+        return torch.randn(self.args.num_features).to(device)
 
 def collect_random_trajectory(world):
     world.reset()
@@ -78,7 +78,7 @@ def collect_random_trajectory(world):
         next_obs[i] = next_ob
         rews[i] = rew
 
-    return obs, actions, next_obs, rews
+    return obs.to(device), actions.to(device), next_obs.to(device), rews.to(device)
 
 def collect_dataset(args, world, mean=None, std=None):
     feature_extractor = FeatureExtractor(args)
@@ -96,7 +96,7 @@ def collect_dataset(args, world, mean=None, std=None):
             featurized = feature_extractor.featurize(traj)
             query.append(featurized)
         
-        query = torch.stack(query)
+        query = torch.stack(query).to(device)
         dataset.insert(query)
 
         if args.verbose and (i+1) % 200 == 0:

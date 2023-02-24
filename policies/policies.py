@@ -5,6 +5,8 @@ from stable_baselines3 import A2C
 from stable_baselines3.common.env_util import make_vec_env
 from utils.helpers import makedir
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 class Policy:
     def __init__(self, args, encoder):
         self.args = args
@@ -32,9 +34,9 @@ class GreedyPolicy(Policy):
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
         queries = dataset.queries[:dataset.buffer_len]
         samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
-        rews = torch.einsum('qij, bmj -> bqim', queries, samples)
-        rews = torch.exp(rews)
-        denoms = torch.sum(rews, dim=-2).unsqueeze(-2)
+        rews = torch.einsum('qij, bmj -> bqim', queries, samples).to(device)
+        rews = torch.exp(rews).to(device)
+        denoms = torch.sum(rews, dim=-2).unsqueeze(-2).to(device)
         posteriors = rews/denoms
         mutual_answers = []
         for answer in range(self.args.query_size):
@@ -42,7 +44,7 @@ class GreedyPolicy(Policy):
             logmean = torch.log2(self.args.m * posteriors[:, :, answer, :] / sample_total)
             mutual = torch.sum(posteriors[:, :, answer, :] * logmean, dim=-1)
             mutual_answers.append(mutual)
-        query_vals = -1.0/self.args.m * torch.sum(torch.stack(mutual_answers), dim=0)
+        query_vals = -1.0/self.args.m * torch.sum(torch.stack(mutual_answers).to(device), dim=0)
         queries_chosen = queries[torch.argmin(query_vals, dim=-1)]
         return queries_chosen
 class RLPolicy(Policy):
@@ -72,7 +74,7 @@ class RLStatePolicy(RLPolicy):
         for b in range(mus.shape[0]):
             action, _ = self.model.predict(obs[b])
             queries.append(dataset.queries[action].squeeze(0))
-        return torch.stack(queries).squeeze(0)
+        return torch.stack(queries).squeeze(0).to(device)
 
     def train_policy(self, dataset, n): 
         self.env = make_vec_env(lambda: metaenvs.QueryActionWorld(self.args, dataset, self.encoder), n_envs=8)
@@ -97,7 +99,7 @@ class RLFeedPolicy(RLPolicy):
                 obs[2*self.args.num_features:] = query.clone()
                 action, _ = self.model.predict(obs)
             queries.append(query.reshape(self.args.query_size,-1))
-        return torch.stack(queries).squeeze(0)
+        return torch.stack(queries).squeeze(0).to(device)
 
     def train_policy(self, dataset, n): 
         self.env = make_vec_env(lambda: metaenvs.QueryStateWorld(self.args, dataset, self.encoder), n_envs=8)

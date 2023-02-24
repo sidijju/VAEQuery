@@ -43,15 +43,15 @@ class Encoder(nn.Module):
         # separate first query from the rest
         correct_embedding = embeddings[:, :, 0, :].unsqueeze(-2)
         rest_embeddings = embeddings[:, :, 1:, :]
-        correct_embedding = torch.flatten(correct_embedding, start_dim=-2)
-        rest_embeddings = torch.flatten(rest_embeddings, start_dim=-2)
+        correct_embedding = torch.flatten(correct_embedding, start_dim=-2).to(device)
+        rest_embeddings = torch.flatten(rest_embeddings, start_dim=-2).to(device)
 
         # fc layer
         correct = self.fc_correct(correct_embedding)
         correct = F.leaky_relu(correct)
         rest = self.fc_rest(rest_embeddings)
         rest = F.leaky_relu(rest)
-        output = torch.cat((correct, rest), dim=-1)
+        output = torch.cat((correct, rest), dim=-1).to(device)
 
         # run through gru
         output, hidden = self.gru(output, hidden)
@@ -68,5 +68,5 @@ class Encoder(nn.Module):
         return mu, logvar, hidden
 
     def init_hidden(self, batchsize):
-        hidden = torch.zeros((self.args.gru_hidden_layers, batchsize, self.hidden_dim))
+        hidden = torch.zeros((self.args.gru_hidden_layers, batchsize, self.hidden_dim)).to(device)
         return hidden

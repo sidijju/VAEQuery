@@ -1,12 +1,11 @@
 import numpy as np
 import torch
-import torch.nn.functional as F
 from query.simulate import response_dist, sample_dist
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def order_queries(queries, answers):
-    ordered_queries = torch.zeros_like(queries)
+    ordered_queries = torch.zeros_like(queries).to(device)
     for b in range(len(queries)):
         # shuffle queries so that the chosen query is first
         idx = list(range(len(queries[0])))
@@ -36,24 +35,24 @@ class VAEStorage:
         self.buffer_len = 0
         self.idx = 0
 
-        self.queries = torch.zeros((self.buffer_size, args.query_size, args.num_features))
+        self.queries = torch.zeros((self.buffer_size, args.query_size, args.num_features)).to(device)
 
         self.mean = None
         self.std = None
 
     def normalize_dataset(self, mean=None, std=None):
         if mean == None:
-            mean = torch.mean(self.queries[:self.buffer_len], dim=(0,1))
+            mean = torch.mean(self.queries[:self.buffer_len], dim=(0,1)).to(device)
             self.mean = mean
         if std == None:
-            std = torch.std(self.queries[:self.buffer_len], dim=(0,1))
+            std = torch.std(self.queries[:self.buffer_len], dim=(0,1)).to(device)
             self.std = std
 
         self.queries = torch.sub(self.queries, mean)
         self.queries = torch.div(self.queries, std)
 
     def get_random_true_rewards(self, batchsize=5):
-        true_rewards = torch.randn(batchsize, self.args.num_features)
+        true_rewards = torch.randn(batchsize, self.args.num_features).to(device)
         true_rewards = true_rewards / torch.norm(true_rewards, dim=-1).unsqueeze(-1)
         return true_rewards
 
@@ -91,8 +90,8 @@ class VAEStorage:
             query_seqs.append(queries)
             answer_seqs.append(answers)
 
-        query_seqs = torch.stack(query_seqs)   
-        answer_seqs = torch.stack(answer_seqs)
+        query_seqs = torch.stack(query_seqs).to(device)   
+        answer_seqs = torch.stack(answer_seqs).to(device)
 
         return true_rewards, query_seqs, answer_seqs
 
