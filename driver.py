@@ -20,6 +20,7 @@ if env == 'gridworld':
     #args.num_features = 4
     args.env_type = env
     args.exp_name = exp_name
+    args.device = torch.device("cuda:"+str(args.device) if torch.cuda.is_available() else "cpu")
 
     # set up random seed
     set_seed(args.seed)
