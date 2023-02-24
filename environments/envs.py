@@ -4,11 +4,11 @@ from gym import spaces
 import numpy as np
 import torch
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 class GridWorld(gym.Env):
 
     def __init__(self, args):
+
+        self.args = args
 
         self.horizon = args.max_trajectory_len
         assert self.horizon > 0
@@ -35,7 +35,7 @@ class GridWorld(gym.Env):
         self.state = np.array((0.0, 0.0))
         self.task = np.array(random.choice(self.possible_tasks))
         self.done = False
-        return torch.tensor(self.state).to(device)
+        return torch.tensor(self.state).to(self.args.device)
 
     def transition(self, action):
         # R, L, U, D, S
@@ -72,4 +72,6 @@ class GridWorld(gym.Env):
         info = {"task": self.task,
                 "step_count": self.step_count}
 
-        return torch.tensor(self.state).to(device), torch.tensor(reward).to(device), torch.tensor(done).to(device), info
+        return torch.tensor(self.state).to(self.args.device), \
+               torch.tensor(reward).to(self.args.device), \
+               torch.tensor(done).to(self.args.device), info

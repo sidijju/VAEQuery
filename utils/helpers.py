@@ -3,8 +3,6 @@ import numpy as np
 import torch
 from storage.vae_storage import VAEStorage
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
 def makedir(dirname = "visualizations"):
     if not os.path.exists(dirname):
         os.mkdir(dirname)
@@ -59,7 +57,7 @@ class FeatureExtractor:
             features[3] = sum([distance(0, 0, ob[1], 0) for ob in next_obs])/len(obs)
 
         #return features
-        return torch.randn(self.args.num_features).to(device)
+        return torch.randn(self.args.num_features).to(self.args.device)
 
 def collect_random_trajectory(world):
     world.reset()
@@ -78,7 +76,7 @@ def collect_random_trajectory(world):
         next_obs[i] = next_ob
         rews[i] = rew
 
-    return obs.to(device), actions.to(device), next_obs.to(device), rews.to(device)
+    return obs, actions, next_obs, rews
 
 def collect_dataset(args, world, mean=None, std=None):
     feature_extractor = FeatureExtractor(args)
@@ -93,10 +91,12 @@ def collect_dataset(args, world, mean=None, std=None):
         query = []
         for _ in range(args.query_size):
             traj = collect_random_trajectory(world)
+            for item in traj:
+                item.to(args.device)
             featurized = feature_extractor.featurize(traj)
             query.append(featurized)
         
-        query = torch.stack(query).to(device)
+        query = torch.stack(query).to(args.device)
         dataset.insert(query)
 
         if args.verbose and (i+1) % 200 == 0:
@@ -107,7 +107,7 @@ def collect_dataset(args, world, mean=None, std=None):
 
 def reparameterize(args, mu, logvar, samples=1):
     if args.sample_belief:
-        belief = (torch.randn(samples, logvar.shape[0], args.num_features) * torch.sqrt(torch.exp(logvar))) + mu
+        belief = (torch.randn(samples, logvar.shape[0], args.num_features).to(args.device) * torch.sqrt(torch.exp(logvar))) + mu
         belief = belief.transpose(0, 1)
     else:
         belief = mu.unsqueeze(1).repeat(1, samples, 1)
