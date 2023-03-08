@@ -160,20 +160,44 @@ class Learner:
             # train policy
             self.policy.train_policy(self.train_dataset, n=self.args.policy_spi)
 
+            ### get query dataset for meta-iteration ###
+
+            # get batch of starting queries for iteration
+            true_humans, queries, answers = self.train_dataset.get_batch(batchsize=self.batchsize)
+            queries = order_queries(queries, answers)
+
+            # initialize storage for entire iteration
+            query_seqs = torch.zeros((self.args.sequence_length, *(queries.shape))).to(self.args.device)
+            mus = torch.zeros((self.args.sequence_length, self.batchsize, self.args.num_features)).to(self.args.device)
+            logvars = torch.zeros_like(mus).to(self.args.device)
+
+            # set first query in sequences to the batch
+            query_seqs[0] = queries
+
+            # initialize hidden variables
+            hidden = self.encoder.init_hidden(batchsize=self.batchsize)
+
+            # compute query sequence using encoder
+            for t in range(self.args.sequence_length):
+                # get beliefs from queries and answers
+                mus[t], logvars[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
+            
+                if t+1 < self.args.sequence_length:
+                    # get next queries
+                    next_queries = self.policy.run_policy(mus[t], logvars[t], self.train_dataset)
+                    next_answers = respond_queries(self.args, next_queries, true_humans)
+                    next_queries = order_queries(next_queries, next_answers)
+
+                        # add next queries to sequence
+                    query_seqs[t+1] = next_queries
+
+            ############################################
+
             # train encoder
             for _ in range(self.args.encoder_spi):
 
-                # get batch of starting queries for iteration
-                true_humans, queries, answers = self.train_dataset.get_batch(batchsize=self.batchsize)
-                queries = order_queries(queries, answers)
-
-                # initialize storage for entire iteration
-                query_seqs = torch.zeros((self.args.sequence_length, *(queries.shape))).to(self.args.device)
-                mus = torch.zeros((self.args.sequence_length, self.batchsize, self.args.num_features)).to(self.args.device)
-                logvars = torch.zeros_like(mus).to(self.args.device)
-
-                # set first query in sequences to the batch
-                query_seqs[0] = queries
+                it_mus = torch.zeros_like(mus).to(self.args.device)
+                it_logvars = torch.zeros_like(logvars).to(self.args.device)
 
                 # initialize hidden variables
                 hidden = self.encoder.init_hidden(batchsize=self.batchsize)
@@ -181,16 +205,7 @@ class Learner:
                 # compute query sequence using encoder
                 for t in range(self.args.sequence_length):
                     # get beliefs from queries and answers
-                    mus[t], logvars[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
-                
-                    if t+1 < self.args.sequence_length:
-                        # get next queries
-                        next_queries = self.policy.run_policy(mus[t], logvars[t], self.train_dataset)
-                        next_answers = respond_queries(self.args, next_queries, true_humans)
-                        next_queries = order_queries(next_queries, next_answers)
-
-                         # add next queries to sequence
-                        query_seqs[t+1] = next_queries
+                    it_mus[t], it_logvars[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
 
                 # get batch of random queries for loss computations 
                 _, loss_queries, loss_answers = self.train_dataset.get_batch(batchsize=self.batchsize, true_rewards=true_humans)
@@ -201,7 +216,7 @@ class Learner:
                 # compute losses over sequence
                 for t in range(self.args.sequence_length):
                     # compute predicted response for each of the loss queries
-                    sample = reparameterize(self.args, mus[t], logvars[t])
+                    sample = reparameterize(self.args, it_mus[t], it_logvars[t])
                     sample = sample.squeeze(1)
                     inputs = response_dist(self.args, loss_queries, sample)
                 
@@ -213,7 +228,7 @@ class Learner:
                     
                     # compute and aggregate loss
                     loss += (t+1) * self.loss(inputs, targets)
-                    loss += (t+1) * torch.sum(torch.square(torch.linalg.norm(mus[t], dim=-1) - 1))
+                    loss += (t+1) * torch.sum(torch.square(torch.linalg.norm(it_mus[t], dim=-1) - 1))
                     
                 # optimize over iteration
                 self.optimizer.zero_grad()
