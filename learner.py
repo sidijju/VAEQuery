@@ -9,18 +9,18 @@ from tqdm import trange
 
 class Learner:
 
-    def __init__(self, args, datasets, policy, encoder=None):
+    def __init__(self, args, datasets, policy, encoder_to_use=None):
         self.args = args
         self.batchsize = self.args.batchsize
         self.train_dataset, self.test_dataset = datasets
         self.exp_name = args.exp_name
 
         # initialize encoder network if not given
-        if not encoder:
+        if not encoder_to_use:
             self.encoder = encoder.Encoder(args)
             self.encoder.to(self.args.device)
         else:
-            self.encoder = encoder
+            self.encoder = encoder_to_use
             self.encoder.to(self.args.device)
 
         # initialize policy
