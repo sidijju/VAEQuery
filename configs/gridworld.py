@@ -23,6 +23,9 @@ def args(rest_args):
                         help='set all learners to use the random encoder')
     parser.set_defaults(random_encoder=False)
 
+    parser.add_argument('--increasing_policy_spi', nargs=2, type=int,
+                        help='use increasing iterations for policy, pass in starting and ending number')
+
     parser.add_argument('--rationality', type=float, default=1,
                         help='Boltzmann rationality temperature')
     parser.add_argument('--m', type=int, default=100,

@@ -160,10 +160,16 @@ class Learner:
         # set model to train mode
         self.encoder.train()
 
+        if self.args.increasing_policy_spi:
+            bounds = self.args.increasing_policy_spi
+            policy_spi_schedule = np.linspace(bounds[0], bounds[1], num=self.args.num_iters, dtype=int)
+        else:
+            policy_spi_schedule = [self.args.policy_spi] * self.args.num_iters
+
         for n in trange(self.args.num_iters):
 
             # train policy
-            self.policy.train_policy(self.train_dataset, n=self.args.policy_spi)
+            self.policy.train_policy(self.train_dataset, n=policy_spi_schedule[n])
 
             ### get query dataset for meta-iteration ###
 
