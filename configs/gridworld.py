@@ -19,6 +19,10 @@ def args(rest_args):
                         help='set user to be optimal based on probability distributions')
     parser.set_defaults(optimal_user=True)
 
+    parser.add_argument('--random_encoder', dest='random_encoder', action='store_true',
+                        help='set all learners to use the random encoder')
+    parser.set_defaults(random_encoder=False)
+
     parser.add_argument('--rationality', type=float, default=1,
                         help='Boltzmann rationality temperature')
     parser.add_argument('--m', type=int, default=100,

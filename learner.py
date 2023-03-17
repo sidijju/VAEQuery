@@ -9,15 +9,19 @@ from tqdm import trange
 
 class Learner:
 
-    def __init__(self, args, datasets, policy):
+    def __init__(self, args, datasets, policy, encoder=None):
         self.args = args
         self.batchsize = self.args.batchsize
         self.train_dataset, self.test_dataset = datasets
         self.exp_name = args.exp_name
 
-         # initialize encoder network
-        self.encoder = encoder.Encoder(args)
-        self.encoder.to(self.args.device)
+        # initialize encoder network if not given
+        if not encoder:
+            self.encoder = encoder.Encoder(args)
+            self.encoder.to(self.args.device)
+        else:
+            self.encoder = encoder
+            self.encoder.to(self.args.device)
 
         # initialize policy
         self.policy = policy(args, self.encoder)
@@ -33,6 +37,7 @@ class Learner:
         self.dir = self.args.log_dir + self.policy.vis_directory
         makedir(self.dir)
 
+    # TODO modify in light of new training procedure
     def pretrain(self): 
         # pre-train encoder with no policy input on whole sequences
         if self.args.verbose:
@@ -193,51 +198,52 @@ class Learner:
 
             ############################################
 
-            # train encoder
-            for _ in range(self.args.encoder_spi):
+            # train encoder if not given previously
+            if not self.args.random_encoder:
+                for _ in range(self.args.encoder_spi):
 
-                it_mus = torch.zeros_like(mus).to(self.args.device)
-                it_logvars = torch.zeros_like(logvars).to(self.args.device)
+                    it_mus = torch.zeros_like(mus).to(self.args.device)
+                    it_logvars = torch.zeros_like(logvars).to(self.args.device)
 
-                # initialize hidden variables
-                hidden = self.encoder.init_hidden(batchsize=self.batchsize)
+                    # initialize hidden variables
+                    hidden = self.encoder.init_hidden(batchsize=self.batchsize)
 
-                # compute query sequence using encoder
-                for t in range(self.args.sequence_length):
-                    # get beliefs from queries and answers
-                    it_mus[t], it_logvars[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
+                    # compute query sequence using encoder
+                    for t in range(self.args.sequence_length):
+                        # get beliefs from queries and answers
+                        it_mus[t], it_logvars[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
 
-                # get batch of random queries for loss computations 
-                _, loss_queries, loss_answers = self.train_dataset.get_batch(batchsize=self.batchsize, true_rewards=true_humans)
+                    # get batch of random queries for loss computations 
+                    _, loss_queries, loss_answers = self.train_dataset.get_batch(batchsize=self.batchsize, true_rewards=true_humans)
 
-                # initialize loss variables
-                loss = 0
-                
-                # compute losses over sequence
-                for t in range(self.args.sequence_length):
-                    # compute predicted response for each of the loss queries
-                    sample = reparameterize(self.args, it_mus[t], it_logvars[t])
-                    sample = sample.squeeze(1)
-                    inputs = response_dist(self.args, loss_queries, sample)
-                
-                    # get inputs for cross entropy loss
-                    inputs = inputs.view(-1, self.args.query_size)
-
-                    # get targets for cross entropy loss
-                    targets = loss_answers.view(-1)
+                    # initialize loss variables
+                    loss = 0
                     
-                    # compute and aggregate loss
-                    loss += (t+1) * self.loss(inputs, targets)
-                    loss += (t+1) * torch.sum(torch.square(torch.linalg.norm(it_mus[t], dim=-1) - 1))
+                    # compute losses over sequence
+                    for t in range(self.args.sequence_length):
+                        # compute predicted response for each of the loss queries
+                        sample = reparameterize(self.args, it_mus[t], it_logvars[t])
+                        sample = sample.squeeze(1)
+                        inputs = response_dist(self.args, loss_queries, sample)
                     
-                # optimize over iteration
-                self.optimizer.zero_grad()
-                loss /= self.batchsize
-                loss.backward()    
-                self.optimizer.step()  
+                        # get inputs for cross entropy loss
+                        inputs = inputs.view(-1, self.args.query_size)
 
-                # store losses
-                losses.append(loss.item())  
+                        # get targets for cross entropy loss
+                        targets = loss_answers.view(-1)
+                        
+                        # compute and aggregate loss
+                        loss += (t+1) * self.loss(inputs, targets)
+                        loss += (t+1) * torch.sum(torch.square(torch.linalg.norm(it_mus[t], dim=-1) - 1))
+                        
+                    # optimize over iteration
+                    self.optimizer.zero_grad()
+                    loss /= self.batchsize
+                    loss.backward()    
+                    self.optimizer.step()  
+
+                    # store losses
+                    losses.append(loss.item())  
 
             if self.args.verbose and (n+1) % 10 == 0:
                 print("\nIteration %2d: Loss = %.3f" % (n+1, losses[-1]))

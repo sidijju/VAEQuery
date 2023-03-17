@@ -42,9 +42,15 @@ args.log_dir = "logs/" + args.exp_name + "/"
 #### set up learners for each policy ####
 
 rand_learner = Learner(args, datasets, RandomPolicy)
-greedy_learner = Learner(args, datasets, GreedyPolicy)
-rl_learner = Learner(args, datasets, RLStatePolicy)
-rl_feed_learner = Learner(args, datasets, RLFeedPolicy)
+
+if args.random_encoder:
+    greedy_learner = Learner(args, datasets, GreedyPolicy, encoder=rand_learner.encoder)
+    rl_learner = Learner(args, datasets, RLStatePolicy, encoder=rand_learner.encoder)
+    rl_feed_learner = Learner(args, datasets, RLFeedPolicy, encoder=rand_learner.encoder)
+else:
+    greedy_learner = Learner(args, datasets, GreedyPolicy)
+    rl_learner = Learner(args, datasets, RLStatePolicy)
+    rl_feed_learner = Learner(args, datasets, RLFeedPolicy)
 
 # set up storage for results
 labels = []
