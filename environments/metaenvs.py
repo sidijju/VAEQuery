@@ -7,11 +7,12 @@ from storage.vae_storage import order_queries
 from utils.helpers import reparameterize
 
 class QueryWorld(gym.Env):
-    def __init__(self, args, dataset, encoder):
+    def __init__(self, args, dataset, encoder, hot_start=False):
         self.args = args
         self.dataset = dataset
         self.encoder = encoder
         self.horizon = args.sequence_length
+        self.rew_func = self.reward_function if hot_start else self.greedy_reward_function
         assert self.horizon > 0
 
     def reset(self):
@@ -28,6 +29,20 @@ class QueryWorld(gym.Env):
         self.mu = self.mu.to(self.args.device)
         self.logvar = self.logvar.to(self.args.device)
 
+    def greedy_reward_function(self, query, answer, mus, logvars):
+        samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
+        rew = torch.exp(torch.bmm(query, samples.mT)).to(self.args.device)
+        denom = torch.sum(rew, dim=-2).unsqueeze(-2).to(self.args.device)
+        posteriors = rew/denom
+        mutual_answers = []
+        for answer in range(self.args.query_size):
+            sample_total = torch.sum(posteriors[:, answer], dim=-1).unsqueeze(-1)
+            logmean = torch.log2(self.args.m * posteriors[:, answer] / sample_total)
+            mutual = torch.sum(posteriors[:, answer] * logmean, dim=-1)
+            mutual_answers.append(mutual)
+        query_val = -1.0/self.args.m * torch.sum(torch.stack(mutual_answers).to(self.args.device), dim=0)
+        return query_val.item()
+
     def reward_function(self, query, answer, mus, logvars):
         samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
         rew = torch.exp(torch.bmm(query, samples.mT)).to(self.args.device)
@@ -43,8 +58,8 @@ class QueryWorld(gym.Env):
 
 class QueryActionWorld(QueryWorld):
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.observation_space = spaces.Box(low=-1, high=1, shape=(2 * self.args.num_features, ))
         self.action_space = spaces.Discrete(self.dataset.buffer_len)
         # set initial vars
@@ -59,7 +74,7 @@ class QueryActionWorld(QueryWorld):
             self.step_count += 1
             query = self.dataset.queries[action].unsqueeze(0).clone()
             answer = sample_dist(self.args, response_dist(self.args, query, self.true_human)).squeeze(0)
-            reward = self.reward_function(query, answer, self.mu, self.logvar)
+            reward = self.rew_func(query, answer, self.mu, self.logvar)
             query = order_queries(query, answer)
             self.mu, self.logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
             self.state[:self.args.num_features] = self.mu.cpu().detach().numpy()
@@ -76,8 +91,8 @@ class QueryActionWorld(QueryWorld):
 
 class QueryStateWorld(QueryWorld):
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=((2+self.args.query_size) * self.args.num_features,))
         self.action_space = spaces.Discrete(2)
         # set initial vars
@@ -96,7 +111,7 @@ class QueryStateWorld(QueryWorld):
                 self.step_count += 1
                 answer = sample_dist(self.args, response_dist(self.args, self.query, self.true_human)).squeeze(0)
                 query = order_queries(self.query, answer)
-                reward = self.reward_function(query, 0, self.mu, self.logvar)
+                reward = self.rew_func(query, 0, self.mu, self.logvar)
                 self.mu, self.logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
                 self.state[:self.args.num_features] = self.mu.cpu().detach().numpy()
                 self.state[self.args.num_features:2*self.args.num_features] = self.logvar.cpu().detach().numpy()

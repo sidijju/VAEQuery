@@ -23,6 +23,10 @@ def args(rest_args):
                         help='set all learners to use the random encoder')
     parser.set_defaults(random_encoder=False)
 
+    parser.add_argument('--hot_start', dest='hot_start', action='store_true',
+                        help='initialize RL replay buffers with the greedy replay buffer')
+    parser.set_defaults(hot_start=False)
+
     parser.add_argument('--increasing_policy_spi', nargs=2, type=int,
                         help='use increasing iterations for policy, pass in starting and ending number')
 

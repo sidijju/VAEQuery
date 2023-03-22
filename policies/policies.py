@@ -10,10 +10,13 @@ class Policy:
         self.args = args
         self.encoder = encoder
 
+    def pretrain_policy(self, dataset, n):
+        pass
+
     def run_policy(self, mus, logvars, dataset) -> torch.Tensor:
         pass
 
-    def train_policy(self, dataset, n=1000):
+    def train_policy(self, dataset, i, n=1000):
         pass
 
 class RandomPolicy(Policy):
@@ -53,13 +56,20 @@ class RLPolicy(Policy):
         makedir(self.log_dir)
         self.model, self.env = None, None
 
-    def train_policy(self, dataset, n):
+    def pretrain_policy(self, n):
         if not self.model:
             self.model = A2C("MlpPolicy", self.env, verbose=1, tensorboard_log=self.log_dir, learning_rate=self.args.lr)
         else:
             self.model.set_env(self.env)
-        self.model.learn(total_timesteps=n, log_interval=10, tb_log_name="def", reset_num_timesteps=False)
-        self.model.save(self.log_dir + "/model")
+        self.model.learn(total_timesteps=n, log_interval=10, tb_log_name="pre", reset_num_timesteps=True)
+        self.model.save(self.log_dir + "/start_model")
+
+    def train_policy(self, i, n):
+        if not self.model:
+            self.model = A2C("MlpPolicy", self.env, verbose=1, tensorboard_log=self.log_dir, learning_rate=self.args.lr)
+        else:
+            self.model.set_env(self.env)
+        self.model.learn(total_timesteps=n, log_interval=10, tb_log_name="def"+str(i), reset_num_timesteps=False)
 
 class RLStatePolicy(RLPolicy):
     def __init__(self, *args):
@@ -74,10 +84,14 @@ class RLStatePolicy(RLPolicy):
             action, _ = self.model.predict(obs[b])
             queries.append(dataset.queries[action].squeeze(0))
         return torch.stack(queries).squeeze(0).to(self.args.device)
-
-    def train_policy(self, dataset, n): 
+    
+    def pretrain_policy(self, dataset, n):
+        self.env = make_vec_env(lambda: metaenvs.QueryActionWorld(self.args, dataset, self.encoder, hot_start=True), n_envs=8)
+        super().pretrain_policy(n)
+    
+    def train_policy(self, dataset, i, n): 
         self.env = make_vec_env(lambda: metaenvs.QueryActionWorld(self.args, dataset, self.encoder), n_envs=8)
-        super().train_policy(dataset, n)
+        super().train_policy(i, n)
 
 class RLFeedPolicy(RLPolicy):
     def __init__(self, *args):
@@ -99,7 +113,11 @@ class RLFeedPolicy(RLPolicy):
                 action, _ = self.model.predict(obs)
             queries.append(query.reshape(self.args.query_size,-1))
         return torch.stack(queries).squeeze(0).to(self.args.device)
+    
+    def pretrain_policy(self, dataset, n):
+        self.env = make_vec_env(lambda: metaenvs.QueryStateWorld(self.args, dataset, self.encoder, hot_start=True), n_envs=8)
+        super().pretrain_policy(n)
 
-    def train_policy(self, dataset, n): 
+    def train_policy(self, dataset, i, n): 
         self.env = make_vec_env(lambda: metaenvs.QueryStateWorld(self.args, dataset, self.encoder), n_envs=8)
-        super().train_policy(dataset, n)
+        super().train_policy(i, n)

@@ -38,7 +38,7 @@ class Learner:
         makedir(self.dir)
 
     # TODO modify in light of new training procedure
-    def pretrain(self): 
+    def pretrain_encoder(self): 
         # pre-train encoder with no policy input on whole sequences
         if self.args.verbose:
             print("######### PRE TRAINING #########")
@@ -147,11 +147,14 @@ class Learner:
             plt.title("Pretraining Evaluation - Reward Alignment")
             plt.savefig(self.dir + "preeval-alignment")
             plt.close()
-            
+                
     def train(self):
         # pretrain encoder if necessary
         if self.args.pretrain_iters > 0:
-            self.pretrain()
+            self.pretrain_encoder()
+
+        if self.args.hot_start:
+            self.policy.pretrain_policy(self.train_dataset, n=30000)
 
         if self.args.verbose:
             print("########### TRAINING ###########")
@@ -169,7 +172,7 @@ class Learner:
         for n in trange(self.args.num_iters):
 
             # train policy
-            self.policy.train_policy(self.train_dataset, n=policy_spi_schedule[n])
+            self.policy.train_policy(self.train_dataset, n, n=policy_spi_schedule[n])
 
             ### get query dataset for meta-iteration ###
 
@@ -264,6 +267,11 @@ class Learner:
             plt.savefig(self.dir + "train-loss")
             plt.close()
 
+        # save models
+        torch.save(self.encoder.state_dict(), self.dir + "model.pt")
+        # TODO fix later
+        self.policy.model.save(self.policy.log_dir + "model")
+
         return losses
 
     def test(self, batch=None):
@@ -343,9 +351,6 @@ class Learner:
             plt.title("Test Evaluation - Reward Alignment")
             plt.savefig(self.dir + "test-alignment")
             plt.close()
-
-        # save encoder model
-        torch.save(self.encoder.state_dict(), self.dir + "model.pt")
 
         # return test results
         return mses_mean, alignments_mean
