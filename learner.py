@@ -24,7 +24,7 @@ class Learner:
             self.encoder.to(self.args.device)
 
         # initialize policy
-        self.policy = policy(args, self.encoder)
+        self.policy = policy(args, self.encoder, self.train_dataset)
 
         # initialize optimizer for model
         self.optimizer = optim.Adam(self.encoder.parameters(), lr=args.lr)
@@ -154,7 +154,7 @@ class Learner:
             self.pretrain_encoder()
 
         if self.args.hot_start:
-            self.policy.pretrain_policy(self.train_dataset, n=30000)
+            self.policy.pretrain_policy(n=30000)
 
         if self.args.verbose:
             print("########### TRAINING ###########")
@@ -172,7 +172,7 @@ class Learner:
         for n in trange(self.args.num_iters):
 
             # train policy
-            self.policy.train_policy(self.train_dataset, n, n=policy_spi_schedule[n])
+            self.policy.train_policy(n, n=policy_spi_schedule[n])
 
             ### get query dataset for meta-iteration ###
 
@@ -270,7 +270,8 @@ class Learner:
         # save models
         torch.save(self.encoder.state_dict(), self.dir + "model.pt")
         # TODO fix later
-        self.policy.model.save(self.policy.log_dir + "model")
+        if hasattr(self.policy, "model"):
+            self.policy.model.save(self.policy.log_dir + "model")
 
         return losses
 
