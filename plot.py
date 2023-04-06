@@ -242,17 +242,3 @@ rll1, rlm1, rla1 = test(rl_model, rl_policy, "inc_spi/rlencrlpolicy/", 'logs/inc
 rl_feed_model = Encoder(args)
 rl_feed_model.load_state_dict(torch.load('logs/inc_spi/rl-feed/model.pt'))
 rlfeedl1, rlfeedm1, rlfeeda1 = test(rl_feed_model, rl_feed_policy, "inc_spi/rlfeedencrlfeedpolicy/", 'logs/inc_spi/rl-feed/model')
-
-# plot performance of greedy model start
-
-# makedir('hs')
-# rl_model = Encoder(args)
-# rl_model.load_state_dict(torch.load('logs/hot_start/rl/model.pt'))
-# rll1, rlm1, rla1 = test(rl_model, rl_policy, "hs/start/", 'logs/hot_start/rl-feed/start_model.zip')
-# rll2, rlm2, rla2 = test(rl_model, rl_policy, "hs/end/", 'logs/hot_start/rl-feed/model.zip')
-
-# rl_feed_model = Encoder(args)
-# rl_feed_model.load_state_dict(torch.load('logs/hot_start/rl-feed/model.pt'))
-# rlfeedl1, rlfeedm1, rlfeeda1 = test(rl_feed_model, rl_feed_policy, "hs/start/", 'logs/hot_start/rl-feed/start_model')
-# rlfeedl2, rlfeedm2, rlfeeda2 = test(rl_feed_model, rl_feed_policy, "hs/end/", 'logs/hot_start/rl-feed/model')
-
