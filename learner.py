@@ -153,9 +153,6 @@ class Learner:
         if self.args.pretrain_iters > 0:
             self.pretrain_encoder()
 
-        if self.args.hot_start:
-            self.policy.pretrain_policy(n=30000)
-
         if self.args.verbose:
             print("########### TRAINING ###########")
 

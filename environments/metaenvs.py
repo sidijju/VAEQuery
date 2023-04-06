@@ -7,12 +7,11 @@ from storage.vae_storage import order_queries
 from utils.helpers import reparameterize
 
 class QueryWorld(gym.Env):
-    def __init__(self, args, dataset, encoder, hot_start=False):
+    def __init__(self, args, dataset, encoder):
         self.args = args
         self.dataset = dataset
         self.encoder = encoder
         self.horizon = args.sequence_length
-        self.rew_func = self.reward_function if hot_start else self.greedy_reward_function
         assert self.horizon > 0
 
     def reset(self):
@@ -28,20 +27,6 @@ class QueryWorld(gym.Env):
         self.state[self.args.num_features:2*self.args.num_features] = self.logvar.detach().numpy()
         self.mu = self.mu.to(self.args.device)
         self.logvar = self.logvar.to(self.args.device)
-
-    def greedy_reward_function(self, query, answer, mus, logvars):
-        samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
-        rew = torch.exp(torch.bmm(query, samples.mT)).to(self.args.device)
-        denom = torch.sum(rew, dim=-2).unsqueeze(-2).to(self.args.device)
-        posteriors = rew/denom
-        mutual_answers = []
-        for answer in range(self.args.query_size):
-            sample_total = torch.sum(posteriors[:, answer], dim=-1).unsqueeze(-1)
-            logmean = torch.log2(self.args.m * posteriors[:, answer] / sample_total)
-            mutual = torch.sum(posteriors[:, answer] * logmean, dim=-1)
-            mutual_answers.append(mutual)
-        query_val = -1.0/self.args.m * torch.sum(torch.stack(mutual_answers).to(self.args.device), dim=0)
-        return query_val.item()
 
     def reward_function(self, query, answer, mus, logvars):
         samples = reparameterize(self.args, mus, logvars, samples=self.args.m)
