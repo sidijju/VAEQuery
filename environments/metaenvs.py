@@ -59,7 +59,7 @@ class QueryActionWorld(QueryWorld):
             self.step_count += 1
             query = self.dataset.queries[action].unsqueeze(0).clone()
             answer = sample_dist(self.args, response_dist(self.args, query, self.true_human)).squeeze(0)
-            reward = self.rew_func(query, answer, self.mu, self.logvar)
+            reward = self.reward_function(query, answer, self.mu, self.logvar)
             query = order_queries(query, answer)
             self.mu, self.logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
             self.state[:self.args.num_features] = self.mu.cpu().detach().numpy()
@@ -96,7 +96,7 @@ class QueryStateWorld(QueryWorld):
                 self.step_count += 1
                 answer = sample_dist(self.args, response_dist(self.args, self.query, self.true_human)).squeeze(0)
                 query = order_queries(self.query, answer)
-                reward = self.rew_func(query, 0, self.mu, self.logvar)
+                reward = self.reward_function(query, 0, self.mu, self.logvar)
                 self.mu, self.logvar, self.hidden = self.encoder(query.unsqueeze(0), self.hidden)
                 self.state[:self.args.num_features] = self.mu.cpu().detach().numpy()
                 self.state[self.args.num_features:2*self.args.num_features] = self.logvar.cpu().detach().numpy()
