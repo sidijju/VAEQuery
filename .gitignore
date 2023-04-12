@@ -5,3 +5,5 @@
 *.pt
 *.zip
 events.out.tfevents*
+*.txt
+*.json
