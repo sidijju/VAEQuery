@@ -6,21 +6,22 @@ import matplotlib.pyplot as plt
 from query.simulate import *
 from storage.vae_storage import *
 from tqdm import trange
+from policies.policies import GreedyApproximationPolicy
 
 class Learner:
 
-    def __init__(self, args, datasets, policy, encoder_to_use=None):
+    def __init__(self, args, datasets, policy, encoder_start=None):
         self.args = args
         self.batchsize = self.args.batchsize
         self.train_dataset, self.test_dataset = datasets
         self.exp_name = args.exp_name
 
         # initialize encoder network if not given
-        if not encoder_to_use:
+        if not encoder_start:
             self.encoder = encoder.Encoder(args)
             self.encoder.to(self.args.device)
         else:
-            self.encoder = encoder_to_use
+            self.encoder = encoder_start
             self.encoder.to(self.args.device)
 
         # initialize policy
@@ -37,121 +38,77 @@ class Learner:
         self.dir = self.args.log_dir + self.policy.vis_directory
         makedir(self.dir)
 
-    # TODO modify in light of new training procedure
-    def pretrain_encoder(self): 
-        # pre-train encoder with no policy input on whole sequences
-        if self.args.verbose:
-            print("######### PRE TRAINING #########")
-            
-        losses = []
-        # set model to train mode
-        self.encoder.train()
+    ### get query dataset for meta-iteration ###
+    def compute_sequence(self):
+        # get batch of starting queries for iteration
+        true_humans, queries, answers = self.train_dataset.get_batch(batchsize=self.batchsize)
+        queries = order_queries(queries, answers)
 
-        for i in range(self.args.pretrain_iters):
-            true_humans, query_seqs, answer_seqs = self.train_dataset.get_batch_seq(batchsize=self.batchsize, seqlength=self.args.sequence_length)
+        # initialize storage for entire iteration
+        query_seqs = torch.zeros((self.args.sequence_length, *(queries.shape))).to(self.args.device)
+        mus = torch.zeros((self.args.sequence_length, self.batchsize, self.args.num_features)).to(self.args.device)
+        logvars = torch.zeros_like(mus).to(self.args.device)
 
-            # initialize hidden and loss variables
-            hidden = self.encoder.init_hidden(batchsize=self.batchsize)
-            loss = 0
+        # set first query in sequences to the batch
+        query_seqs[0] = queries
 
-            # manually handle hidden inputs for gru for sequence
-            for t in range(self.args.sequence_length):
-                queries, answers = query_seqs[t].unsqueeze(0), answer_seqs[t].unsqueeze(0)
+        # initialize hidden variables
+        hidden = self.encoder.init_hidden(batchsize=self.batchsize)
 
-                beliefs, hidden = self.encoder(queries, answers, hidden)
-
-                # compute predicted response at timestep for each sequence
-                inputs = response_dist(self.args, queries, beliefs)
-
-                # get inputs and targets for cross entropy loss
-                inputs = inputs.view(-1, self.args.query_size)
-                targets = answer_seqs[t, :].view(-1)
-
-                loss += self.loss(inputs, targets)
-            
-            self.optimizer.zero_grad()
-            loss /= self.args.sequence_length
-            loss.backward()     
-            losses.append(loss.item())           
-            self.optimizer.step()    
-
-            if self.args.verbose and (i+1) % 100 == 0:
-                print("Iteration %2d: Loss = %.3f" % (i + 1, loss))
-                
-        # save plots for losses after pre training
-        if self.args.visualize:
-            plt.plot(losses)
-            plt.xlabel("Iterations")
-            plt.ylabel("CE Error")
-            plt.title("Query Distribution vs. Answer Error")
-            plt.savefig(self.dir + "pretrain-loss")
-            plt.close()
-
-        # evaluate encoder on test batch
-        if self.args.verbose:
-            print("######### PRE TRAINING - EVALUATION #########")
-            
-        test_losses = []
-        mses = []
-        alignments = []
+        # compute query sequence using encoder
+        for t in range(self.args.sequence_length):
+            # get beliefs from queries and answers
+            mus[t], logvars[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
         
-        with torch.no_grad():
-            # set model to eval mode
-            self.encoder.eval()
+            if t+1 < self.args.sequence_length:
+                # get next queries
+                next_queries = self.policy.run_policy(mus[t], logvars[t], self.train_dataset)
+                next_answers = respond_queries(self.args, next_queries, true_humans)
+                next_queries = order_queries(next_queries, next_answers)
 
-            true_humans, query_seqs, answer_seqs = self.train_dataset.get_batch_seq(batchsize=self.batchsize, seqlength=self.args.sequence_length)
-            hidden = self.encoder.init_hidden(batchsize=self.batchsize)
+                    # add next queries to sequence
+                query_seqs[t+1] = next_queries
 
-            for t in range(self.args.sequence_length):
-                queries, answers = query_seqs[t].unsqueeze(0), answer_seqs[t].unsqueeze(0)
+        return query_seqs, mus, logvars, true_humans
+    
+    def compute_loss_over_sequence(self, query_seqs, mus, logvars, true_humans):
+        it_mus = torch.zeros_like(mus).to(self.args.device)
+        it_logvars = torch.zeros_like(logvars).to(self.args.device)
 
-                beliefs, hidden = self.encoder(queries, answers, hidden)
+        # initialize hidden variables
+        hidden = self.encoder.init_hidden(batchsize=self.batchsize)
 
-                # compute predicted response at timestep for each sequence
-                inputs = response_dist(self.args, queries, beliefs)
+        # compute query sequence using encoder
+        for t in range(self.args.sequence_length):
+            # get beliefs from queries and answers
+            it_mus[t], it_logvars[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
 
-                # get inputs and targets for cross entropy loss
-                inputs = inputs.view(-1, self.args.query_size)
-                targets = answer_seqs[t, :].view(-1)
+        # get batch of random queries for loss computations 
+        _, loss_queries, loss_answers = self.train_dataset.get_batch(batchsize=self.batchsize, true_rewards=true_humans)
 
-                loss = self.loss(inputs, targets)
-                mse = self.mse(beliefs, true_humans)
-                align = alignment(beliefs, true_humans).mean()
+        # initialize loss variables
+        loss = 0
+        
+        # compute losses over sequence
+        for t in range(self.args.sequence_length):
+            # compute predicted response for each of the loss queries
+            sample = reparameterize(self.args, it_mus[t], it_logvars[t])
+            sample = sample.squeeze(1)
+            inputs = response_dist(self.args, loss_queries, sample)
+        
+            # get inputs for cross entropy loss
+            inputs = inputs.view(-1, self.args.query_size)
 
-                test_losses.append(loss)
-                mses.append(mse)
-                alignments.append(align)
+            # get targets for cross entropy loss
+            targets = loss_answers.view(-1)
+            
+            # compute and aggregate loss
+            loss += (t+1) * self.loss(inputs, targets)
+            loss += (t+1) * torch.sum(torch.square(torch.linalg.norm(it_mus[t], dim=-1) - 1))
 
-                if self.args.verbose:
-                    print("Query %2d: Loss = %.3f, MSE = %.3f, Alignment = %.3f" % (t, loss, mse, align))
+        return loss
 
-        # save plots for errors after pre training
-        if self.args.visualize:
-            plt.plot(test_losses)
-            plt.xlabel("Queries")
-            plt.ylabel("CE Loss")
-            plt.title("Pretraining Evaluation - Loss")
-            plt.savefig(self.dir + "preeval-loss")
-            plt.close()
-
-            plt.plot(mses)
-            plt.xlabel("Queries")
-            plt.ylabel("MSE")
-            plt.title("Pretraining Evaluation - Reward Error")
-            plt.savefig(self.dir + "preeval-error")
-            plt.close()
-
-            plt.plot(alignments)
-            plt.xlabel("Queries")
-            plt.ylabel("Alignment")
-            plt.title("Pretraining Evaluation - Reward Alignment")
-            plt.savefig(self.dir + "preeval-alignment")
-            plt.close()
-                
     def train(self):
-        # pretrain encoder if necessary
-        if self.args.pretrain_iters > 0:
-            self.pretrain_encoder()
 
         if self.args.verbose:
             print("########### TRAINING ###########")
@@ -166,94 +123,57 @@ class Learner:
         else:
             policy_spi_schedule = [self.args.policy_spi] * self.args.num_iters
 
-        for n in trange(self.args.num_iters):
+        if isinstance(self.policy, GreedyApproximationPolicy):
 
-            # train policy
-            self.policy.train_policy(n, n=policy_spi_schedule[n])
+            self.policy.train_policy(0, n=policy_spi_schedule[0])
 
-            ### get query dataset for meta-iteration ###
+            for n in trange(self.args.num_iters):
 
-            # get batch of starting queries for iteration
-            true_humans, queries, answers = self.train_dataset.get_batch(batchsize=self.batchsize)
-            queries = order_queries(queries, answers)
+                query_seqs, mus, logvars, true_humans = self.compute_sequence()
 
-            # initialize storage for entire iteration
-            query_seqs = torch.zeros((self.args.sequence_length, *(queries.shape))).to(self.args.device)
-            mus = torch.zeros((self.args.sequence_length, self.batchsize, self.args.num_features)).to(self.args.device)
-            logvars = torch.zeros_like(mus).to(self.args.device)
-
-            # set first query in sequences to the batch
-            query_seqs[0] = queries
-
-            # initialize hidden variables
-            hidden = self.encoder.init_hidden(batchsize=self.batchsize)
-
-            # compute query sequence using encoder
-            for t in range(self.args.sequence_length):
-                # get beliefs from queries and answers
-                mus[t], logvars[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
-            
-                if t+1 < self.args.sequence_length:
-                    # get next queries
-                    next_queries = self.policy.run_policy(mus[t], logvars[t], self.train_dataset)
-                    next_answers = respond_queries(self.args, next_queries, true_humans)
-                    next_queries = order_queries(next_queries, next_answers)
-
-                        # add next queries to sequence
-                    query_seqs[t+1] = next_queries
-
-            ############################################
-
-            # train encoder if not given previously
-            if not self.args.random_encoder:
                 for _ in range(self.args.encoder_spi):
 
-                    it_mus = torch.zeros_like(mus).to(self.args.device)
-                    it_logvars = torch.zeros_like(logvars).to(self.args.device)
-
-                    # initialize hidden variables
-                    hidden = self.encoder.init_hidden(batchsize=self.batchsize)
-
-                    # compute query sequence using encoder
-                    for t in range(self.args.sequence_length):
-                        # get beliefs from queries and answers
-                        it_mus[t], it_logvars[t], hidden = self.encoder(query_seqs[t].clone().unsqueeze(0), hidden)
-
-                    # get batch of random queries for loss computations 
-                    _, loss_queries, loss_answers = self.train_dataset.get_batch(batchsize=self.batchsize, true_rewards=true_humans)
-
-                    # initialize loss variables
-                    loss = 0
+                    loss = self.compute_loss_over_sequence(query_seqs, mus, logvars, true_humans)
                     
-                    # compute losses over sequence
-                    for t in range(self.args.sequence_length):
-                        # compute predicted response for each of the loss queries
-                        sample = reparameterize(self.args, it_mus[t], it_logvars[t])
-                        sample = sample.squeeze(1)
-                        inputs = response_dist(self.args, loss_queries, sample)
-                    
-                        # get inputs for cross entropy loss
-                        inputs = inputs.view(-1, self.args.query_size)
-
-                        # get targets for cross entropy loss
-                        targets = loss_answers.view(-1)
-                        
-                        # compute and aggregate loss
-                        loss += (t+1) * self.loss(inputs, targets)
-                        loss += (t+1) * torch.sum(torch.square(torch.linalg.norm(it_mus[t], dim=-1) - 1))
-                        
-                    # optimize over iteration
-                    self.optimizer.zero_grad()
-                    loss /= self.batchsize
-                    loss.backward()    
-                    self.optimizer.step()  
+                    # train encoder if not given previously
+                    if self.train_encoder:
+                        self.encoder.train()
+                        self.optimizer.zero_grad()
+                        loss.backward()    
+                        self.optimizer.step()
 
                     # store losses
                     losses.append(loss.item())  
 
-            if self.args.verbose and (n+1) % 10 == 0:
-                print("\nIteration %2d: Loss = %.3f" % (n+1, losses[-1]))
-       
+                if self.args.verbose and (n+1) % 10 == 0:
+                    print("\nIteration %2d: Loss = %.3f" % (n+1, losses[-1]))
+
+        else:
+            for n in trange(self.args.num_iters):
+
+                # train policy
+                self.policy.train_policy(n, n=policy_spi_schedule[n])
+
+                query_seqs, mus, logvars, true_humans = self.compute_sequence()
+
+                # train encoder if not given previously
+                if not self.args.random_encoder:
+                    for _ in range(self.args.encoder_spi):
+
+                        loss = self.compute_loss_over_sequence(query_seqs, mus, logvars, true_humans)
+                            
+                        # optimize over iteration
+                        self.optimizer.zero_grad()
+                        loss /= self.batchsize
+                        loss.backward()    
+                        self.optimizer.step()  
+
+                        # store losses
+                        losses.append(loss.item())  
+
+                if self.args.verbose and (n+1) % 10 == 0:
+                    print("\nIteration %2d: Loss = %.3f" % (n+1, losses[-1]))
+        
         # save plots for losses after training
         if self.args.visualize:
             plt.plot(losses, label='train')
